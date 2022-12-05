@@ -23,7 +23,7 @@ public class Cuboid : ICuboid
 
     public List<SubCuboid> SubCuboids { get; } = new();
 
-    public Cuboid(Limits1d<int> xLimits, Limits1d<int> yLimits, Limits1d<int> zLimits)
+    public Cuboid(Limits<int> xLimits, Limits<int> yLimits, Limits<int> zLimits)
     {
         Limits = new Limits3d<int>(xLimits, yLimits, zLimits);
     }

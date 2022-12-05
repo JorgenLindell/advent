@@ -17,7 +17,7 @@ public class SubCuboid : Cuboid
         Parent = parent;
     }
 
-    public SubCuboid(Cuboid parent, Limits1d<int> x, Limits1d<int> y, Limits1d<int> z)
+    public SubCuboid(Cuboid parent, Limits<int> x, Limits<int> y, Limits<int> z)
         : base(x, y, z)
     {
         Parent = parent;
@@ -70,35 +70,35 @@ public class SubCuboid : Cuboid
             return subCuboids;
         }
 
-        IEnumerable<Limits1d<int>> Divide2(Limits1d<int> toSplit, Limits1d<int> newLimits)
+        IEnumerable<Limits<int>> Divide2(Limits<int> toSplit, Limits<int> newLimits)
         {
             if (toSplit.lower < newLimits.lower && newLimits.upper < toSplit.upper)
             {//Split in 3, new cuts through
-                yield return new Limits1d<int>(toSplit.lower, newLimits.lower - 1);
-                yield return new Limits1d<int>(newLimits.lower, newLimits.upper);
-                yield return new Limits1d<int>(newLimits.upper + 1, toSplit.upper);
+                yield return new Limits<int>(toSplit.lower, newLimits.lower - 1);
+                yield return new Limits<int>(newLimits.lower, newLimits.upper);
+                yield return new Limits<int>(newLimits.upper + 1, toSplit.upper);
             }
             else if ((toSplit.lower >= newLimits.lower && toSplit.upper <= newLimits.upper)
                      || (toSplit.lower > newLimits.upper)
                      || (toSplit.upper < newLimits.lower))
             {//no split tosplit is fully inside or outside new
-                yield return new Limits1d<int>(toSplit.lower, toSplit.upper);
+                yield return new Limits<int>(toSplit.lower, toSplit.upper);
 
             }
             else if (toSplit.lower < newLimits.lower && toSplit.upper <= newLimits.upper)
             {// split in 2, new overlaps start
-                yield return new Limits1d<int>(toSplit.lower, newLimits.lower - 1);
-                yield return new Limits1d<int>(newLimits.lower, toSplit.upper);
+                yield return new Limits<int>(toSplit.lower, newLimits.lower - 1);
+                yield return new Limits<int>(newLimits.lower, toSplit.upper);
 
             }
             else if (newLimits.lower <= toSplit.lower && newLimits.upper <= toSplit.upper)
             {// split in 2, new overlaps end
-                yield return new Limits1d<int>(toSplit.lower, newLimits.upper);
-                yield return new Limits1d<int>(newLimits.upper + 1, toSplit.upper);
+                yield return new Limits<int>(toSplit.lower, newLimits.upper);
+                yield return new Limits<int>(newLimits.upper + 1, toSplit.upper);
             }
             else
             {
-                yield return new Limits1d<int>(toSplit.lower, toSplit.upper);
+                yield return new Limits<int>(toSplit.lower, toSplit.upper);
             }
         }
 
