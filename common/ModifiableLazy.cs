@@ -7,8 +7,8 @@ namespace common
 
     public class ModifiableLazy<T>
     {
-        private readonly object _syncroot = new object();
-        private StrongBox<T> _value;
+        private readonly object _syncroot = new();
+        private StrongBox<T>? _value;
 
         public T Get(Func<T> valueFactory)
         {
@@ -18,7 +18,7 @@ namespace common
             }
 
             var box = Volatile.Read(ref _value);
-            return box != null ? box.Value : GetOrCreate();
+            return box != null ? box.Value! : GetOrCreate();
 
             T GetOrCreate()
             {
@@ -27,12 +27,12 @@ namespace common
                     box = Volatile.Read(ref _value);
                     if (box != null)
                     {
-                        return box.Value;
+                        return box.Value!;
                     }
 
                     box = new StrongBox<T>(valueFactory());
                     Volatile.Write(ref _value, box);
-                    return box.Value;
+                    return box.Value!;
                 }
             }
         }
@@ -55,11 +55,11 @@ namespace common
             var box = Volatile.Read(ref _value);
             if (box != null)
             {
-                value = box.Value;
+                value = box.Value!;
                 return true;
             }
 
-            value = default(T);
+            value = default(T)!;
             return false;
         }
     }

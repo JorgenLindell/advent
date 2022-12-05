@@ -1,20 +1,28 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Globalization;
+using System.IO;
 
 namespace common
 {
     public class Measure : IDisposable
     {
-        Stopwatch sw = new Stopwatch();
-        public Measure()
+        readonly TextWriter _outWriter = Console.Out;
+        readonly Stopwatch _sw = new();
+        public Measure(TextWriter output=null!)
         {
-            sw.Start();
+            if (output == null)
+                _outWriter =
+                    new DebuggerTextWriter();
+
+            _sw.Start();
         }
 
         public void Dispose()
         {
-            sw.Stop();
-            Console.WriteLine("Timer:" + sw.ElapsedMilliseconds);
+            _sw.Stop();
+            _outWriter.WriteLine("Measure Timer:" + _sw.ElapsedMilliseconds);
+            _outWriter.Dispose();
         }
     }
 }

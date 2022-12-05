@@ -16,7 +16,7 @@ namespace common
             }
 
             // ReSharper disable PossibleMultipleEnumeration
-            first = seq.FirstOrDefault();
+            first = seq.FirstOrDefault()!;
 
             rest = seq.Skip(1);
             // ReSharper restore PossibleMultipleEnumeration

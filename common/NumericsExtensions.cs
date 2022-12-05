@@ -16,6 +16,9 @@ namespace common
 
     }
 
+    /// <summary>
+    /// Decode result of CompareTo
+    /// </summary>
     public static class CompareToResultExtensions
     {
         public static bool GreaterOrEqual(this int r) => r >= 0;
