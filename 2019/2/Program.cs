@@ -7,8 +7,7 @@ using System.IO;
 using System.Linq;
 using common;
 
-namespace _5;
-//https://adventofcode.com/2019/day/2
+namespace _2;
 
 internal class Program
 {
@@ -43,7 +42,8 @@ internal class Program
         {
             for (int j = 0; j < limit; j++)
             {
-                var result = evaluate1(cells, i, j);
+                var machine = new IntCodeMachine2019(cells);
+                var result = machine.Evaluate(i, j);
                 if (result[0] == target)
                 {
                     Debug.WriteLine($"result1: {result[0]} {i}  {j}");
@@ -51,7 +51,7 @@ internal class Program
                 }
                 else
                 {
-                    Debug.WriteLine($"test: {result[0]} {i}  {j}");
+                   // Debug.WriteLine($"test: {result[0]} {i}  {j}");
                 }
             }
         }
@@ -62,40 +62,10 @@ internal class Program
     {
         var cells = stream.ReadLine()!
             .Split(',')
-            .Select(x => x.ToLong().Value)
+            .Select(x => x.ToLong()!.Value)
             .ToArray();
-        var result = evaluate1(cells, 12, 2);
+        var machine = new IntCodeMachine2019(cells);
+        var result= machine.Evaluate(12, 2);
         Debug.WriteLine($"result1: " + result[0]);
     }
-
-    private static long[] evaluate1(long[] inputCells, int noun, int verb)
-    {
-        var cells = inputCells.ToArray();
-        cells[1] = noun;
-        cells[2] = verb;
-        var a = 0;
-        while (a < cells.Length && cells[a] != 99)
-        {
-            switch (cells[a])
-            {
-                case 1: //add
-                    {
-                        var r = cells[cells[++a]] + cells[cells[++a]];
-                        cells[cells[++a]] = r;
-                    }
-                    break;
-                case 2: //mul
-                    {
-                        var r = cells[cells[++a]] * cells[cells[++a]];
-                        cells[cells[++a]] = r;
-                    }
-                    break;
-
-            }
-
-            ++a;
-        }
-        return cells;
-    }
-
 }
