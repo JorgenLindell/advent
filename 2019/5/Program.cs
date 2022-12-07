@@ -1,17 +1,19 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Diagnostics;
+
 using common;
 
-//https://adventofcode.com/2019/day/2
+
+//https://adventofcode.com/2019/day/5
 
 internal class Program
 {
     private static string _testData =
-        @""
+        @"1002,4,3,4,33"
 .Replace("\r\n", "\n");
 
 
@@ -30,30 +32,6 @@ internal class Program
     }
     private static void SecondPart(TextReader stream)
     {
-        var cells = stream.ReadLine()!
-            .Split(',')
-            .Select(x => x.ToLong()!.Value)
-            .ToArray();
-
-        var target = 19_690_720L;
-        var limit = 70;
-        for (int i = 0; i < limit; i++)
-        {
-            for (int j = 0; j < limit; j++)
-            {
-                var machine = new IntCodeMachine2019(cells);
-                var result = machine.Evaluate(i, j);
-                if (result[0] == target)
-                {
-                    Debug.WriteLine($"result1: {result[0]} {i}  {j}");
-                    return;
-                }
-                else
-                {
-                   // Debug.WriteLine($"test: {result[0]} {i}  {j}");
-                }
-            }
-        }
     }
 
 
@@ -64,7 +42,7 @@ internal class Program
             .Select(x => x.ToLong()!.Value)
             .ToArray();
         var machine = new IntCodeMachine2019(cells);
-        var result= machine.Evaluate(12, 2);
+        var result= machine.Evaluate();
         Debug.WriteLine($"result1: " + result[0]);
     }
 }

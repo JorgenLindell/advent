@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using Microsoft.VisualBasic;
 
 namespace common;
 public class IntCodeMachine2019
@@ -9,17 +11,17 @@ public class IntCodeMachine2019
     {
         public long OpCode { get; }
         public int Length { get; }
-        public Func<Memory, int, int> Operation { get; }
+        public Func<Memory, int, char[], int> Operation { get; }
 
         public Instruction(
             long opCode,
             int length,
-            Func<Memory, int, Instruction,  int> operation
+            Func<Memory, int, Instruction, char[], int> operation
         )
         {
             OpCode = opCode;
             Length = length;
-            Operation =(m,i)=> operation(m,i,this);
+            Operation = (m, i, mode) => operation(m, i, this, mode);
         }
     }
 
@@ -37,6 +39,7 @@ public class IntCodeMachine2019
         public long At(int a) => _cells[a];
         public long Set(int a, long content) => _cells[a] = content;
         public long Ref(int a) => _cells[_cells[a]];
+        public long Get(int a, char mode) => mode == '0' ? Ref(a) : At(a);
         public void SetRef(int a, long content) => _cells[_cells[a]] = content;
 
     }
@@ -47,19 +50,47 @@ public class IntCodeMachine2019
         new()
         {
             /*add*/
-            [1] = new Instruction(1, 4, (m, ip,instr) =>
+            [1] = new Instruction(1, 4, (m, ip, instr, mode) =>
             {
-                    m.SetRef(ip + 3, m.Ref(ip + 1) + m.Ref(ip + 2));
-                    return ip + instr.Length;
+                m.SetRef(ip + 3, m.Get(ip + 1, mode[0]) + m.Get(ip + 2, mode[1]));
+                return ip + instr.Length;
             }),
             /*mul*/
-            [2] = new Instruction(2, 4, (m, ip,instr) =>
+            [2] = new Instruction(2, 4, (m, ip, instr, mode) =>
             {
-                    m.SetRef(ip + 3, m.Ref(ip + 1) * m.Ref(ip + 2));
-                    return ip + instr.Length;
-            })
+                m.SetRef(ip + 3, m.Get(ip + 1, mode[0]) * m.Get(ip + 2, mode[1]));
+                return ip + instr.Length;
+            }),
+            /*inp*/
+            [3] = new Instruction(3, 2, (m, ip, instr, mode) =>
+            {
+
+                m.SetRef(ip + 1, InputBox());
+                return ip + instr.Length;
+            }),
+            /*inp*/
+            [4] = new Instruction(4, 2, (m, ip, instr, mode) =>
+        {
+
+            var l = m.Get(ip + 1, mode[0]);
+            Debug.WriteLine($"out: {l}");
+            return ip + instr.Length;
+        })
         };
 
+    private static long InputBox()
+    {
+        long? res = null;
+        string? s = "";
+        do
+        {
+            Console.Write("Give input: ");
+            s = Console.ReadLine();
+        } while (!s.ToLong().HasValue);
+        var l = s.ToLong()!.Value;
+        Debug.WriteLine($"Input: {l}");
+        return l;
+    }
 
 
     public IntCodeMachine2019(IEnumerable<long> inputCells)
@@ -69,15 +100,32 @@ public class IntCodeMachine2019
     public long[] Evaluate(int noun, int verb)
     {
         var memory = new Memory(_inputCells);
+
         memory.Set(1, noun);
         memory.Set(2, verb);
 
-        Ip = 0;
-        while (memory.At(Ip) != 99 )
-        {
-            var instr = Instructions[memory.At(Ip)];
-            Ip = instr.Operation(memory, Ip);
-        }
+        Run(memory);
+
         return memory.Cells;
+    }
+    public long[] Evaluate()
+    {
+        var memory = new Memory(_inputCells);
+
+        Run(memory);
+        return memory.Cells;
+    }
+
+    private void Run(Memory memory)
+    {
+        Ip = 0;
+        while (memory.At(Ip) != 99)
+        {
+            var formatted = memory.At(Ip).ToString("00000");
+            var opCode = formatted.Substring(3, 2).ToLong()!.Value;
+            var mode = formatted.Take(3).Reverse().ToArray();
+            var instr = Instructions[opCode];
+            Ip = instr.Operation(memory, Ip, mode);
+        }
     }
 }

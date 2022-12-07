@@ -7,7 +7,6 @@ using System.IO;
 using System.Linq;
 using common;
 
-namespace _5;
 //https://adventofcode.com/2019/day/1
 
 internal class Program
