@@ -8,6 +8,9 @@ using System.Threading;
 using common;
 
 //https://adventofcode.com/2022/day/7
+
+namespace _7;
+
 internal class Program
 {
     private static string _testData =
@@ -46,14 +49,43 @@ $ ls
 
     private static TextReader GetDataStream()
     {
-        //var stream = StreamUtils.GetInputStream("input.txt");
-        var stream = StreamUtils.GetInputStream(testData: _testData);
+        var stream = StreamUtils.GetInputStream("input.txt");
+        //var stream = StreamUtils.GetInputStream(testData: _testData);
         return stream;
     }
     private static void SecondPart(TextReader stream)
-    { }
+    {
+        var system = LoadSystem(stream);
+        var maxSize = 70000000;
+        var needed = 30000000;
+        var inUse = system.Root.CalculatedSize;
+        var unused = maxSize - inUse;
+        var needToDelete = needed-unused;
+        var valueTuples = system.Root.AllDirectories().Select(x => (x.CalculatedSize, x)).ToList();
+
+        var bigEnough = valueTuples
+            .Where(x => x.CalculatedSize >= needToDelete).ToList();
+        
+        var list = bigEnough
+            .OrderBy(x => x.CalculatedSize)
+            .ToList();
+
+        Debug.WriteLine($"In use: {inUse}");
+        Debug.WriteLine($"unused: {unused}");
+        Debug.WriteLine($"needToDelete: {needToDelete}");
+        Debug.WriteLine($"result2 : Need {needToDelete}   {list.First().CalculatedSize} {list.First().x.FullPath}");
+    }
 
     private static void FirstPart(TextReader stream)
+    {
+        var system = LoadSystem(stream);
+
+        var sum = system.Root.AllDirectories()
+            .Where(x => x.CalculatedSize < 100000).Sum(x => x.CalculatedSize);
+        Debug.WriteLine($"result1 :" + sum);
+    }
+
+    private static FileSystem LoadSystem(TextReader stream)
     {
         var lines = new List<string>();
         var system = new FileSystem();
@@ -69,23 +101,22 @@ $ ls
                 var output = new List<string>();
 
                 var line = lines[++lineIndex];
-                do
+                while (line[0] != '$')
                 {
                     output.Add(line);
                     ++lineIndex;
                     if (lineIndex >= lines.Count) break;
                     line = lines[lineIndex];
-                } while ( line[0] != '$');
+                }
+
+                ;
 
                 system.Parse(command, output);
                 if (lineIndex >= lines.Count) break;
                 command = line;
             }
-
         }
 
-        var sum = system.Root.AllDirectories()
-            .Where(x => x.CalculatedSize < 100000).Sum(x => x.CalculatedSize);
-        Debug.WriteLine($"result1 :"+sum);
+        return system;
     }
 }

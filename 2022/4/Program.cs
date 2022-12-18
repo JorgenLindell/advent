@@ -1,5 +1,7 @@
-﻿using System.Diagnostics;
+﻿using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using common;
 
 namespace _4;
@@ -8,12 +10,11 @@ namespace _4;
 internal class Program
 {
     private static string _testData =
-        @"2-4,6-8
-2-3,4-5
-5-7,7-9
-2-8,3-7
-6-6,4-6
-2-6,4-8"
+        @"30373
+25512
+65332
+33549
+35390"
             .Replace("\r\n", "\n");
 
 
@@ -32,54 +33,93 @@ internal class Program
 
     private static void FirstPart(TextReader stream)
     {
+        char[,] trees = null;
+        int[,] visible = null;
+        int size = 0;
+
         var sum = 0L;
+        var lineIndex = 0;
         while (stream.ReadLine() is { } inpLine)
         {
-            ParseLine(inpLine, out var r1, out var r2);
-            sum += r1.Contains(r2) || r2.Contains(r1) ? 1 : 0;
+            if (trees == null)
+            {
+                size = inpLine.Length;
+                trees = new char[size, size];
+                visible = new int[size, size];
+            }
+            inpLine.ForEach((t, i) => trees[lineIndex, i] = t);
+            ++lineIndex;
+        }
+
+        for (int r = 0; r < size; r++)
+        {
+            visible[r, 0] = visible[r, size - 1] = 1;
+            visible[0, r] = visible[size - 1, r] = 1;
+        }
+
+
+
+        for (int r = 1; r < size - 1; r++)
+        {
+            for (int c = 1; c < size - 1; c++)
+            {
+                visible[r, c] = checkVisibility(trees,r,c);
+            }
+        }
+
+        sum = 0;
+        foreach (var i in visible)
+        {
+            sum += i;
         }
 
         Debug.WriteLine($"result1 :{sum} ");
     }
 
+    private static int checkVisibility(char[,] trees, int r, int c)
+    {
+        var height = trees[r, c];
+        var hiddenDirections = 0;
+        for (var r2 = r; r2 >= 0; --r2)
+        {
+            if (trees[r2, c] >= height)
+            {
+                hiddenDirections++;
+                break;
+            }
+        }
+        for (var r2 = r; r2 < trees.GetUpperBound(0); ++r2)
+        {
+            if (trees[r2, c] >= height)
+            {
+                hiddenDirections++;
+                break;
+            }
+        }
+        for (var c2 = c; c2 >= 0; --c2)
+        {
+            if (trees[r, c2] >= height)
+            {
+                hiddenDirections++;
+                break;
+            }
+        }
+        for (var c2 = c; c2 < trees.GetUpperBound(0); ++c2)
+        {
+            if (trees[r, c2] >= height)
+            {
+                hiddenDirections++;
+                break;
+            }
+        }
+        return hiddenDirections==4?0:1;
+    }
+
     private static void SecondPart(TextReader stream)
     {
-        var sum = 0L;
-        while (stream.ReadLine() is { } inpLine)
-        {
-            ParseLine(inpLine, out var r1, out var r2);
-            sum += r1.Intersects(r2) ? 1 : 0;
-        }
 
-        Debug.WriteLine($"result2 :{sum} ");
+        Debug.WriteLine($"result2 :");
     }
 
-    private static void ParseLine(string inpLine, out Assignment r1, out Assignment r2)
-    {
-        var ranges = inpLine.Split(',');
-        r1 = new Assignment(ranges[0]);
-        r2 = new Assignment(ranges[1]);
-    }
 
-    private readonly struct Assignment
-    {
-        private readonly Limits<int> _limits;
-
-        public Assignment(string range)
-        {
-            var split = range.Split('-');
-            _limits = new Limits<int>(split[0].ToInt()!.Value, split[1].ToInt()!.Value);
-        }
-
-        public bool Contains(Assignment other)
-        {
-            return _limits.Contains(other._limits);
-        }
-
-        public bool Intersects(Assignment other)
-        {
-            return _limits.Intersects(other._limits)
-                ;
-        }
-    }
 }

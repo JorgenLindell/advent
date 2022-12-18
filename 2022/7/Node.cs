@@ -4,16 +4,21 @@ using System.ComponentModel.Design.Serialization;
 using System.Linq;
 using common;
 
+namespace _7;
+
 public class Node
 {
-    public Node(string name)
+    public Node(string name, Node parent)
     {
         Name = name;
+        Size = 0;
+        Parent = parent;
     }
-    public Node(string name, long size)
+    public Node(string name, long size, Node parent)
     {
         Name = name;
         Size = size;
+        Parent = parent;
     }
 
     public Node Parent { get; set; } = null;
@@ -40,11 +45,11 @@ public class Node
             var parts = row.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             if (parts[0] == "dir")
             {
-                Children.Add(parts[1], new Node(parts[1], 0));
+                Children.Add(parts[1], new Node(parts[1], this));
             }
             else
             {
-                Children.Add(parts[1], new Node(parts[1], parts[0].ToLong()!.Value));
+                Children.Add(parts[1], new Node(parts[1], parts[0].ToLong()!.Value,this));
             }
         }
     }
@@ -94,7 +99,7 @@ public class FileSystem
 
     public FileSystem()
     {
-        CurrentDirectory = new Node(PathSeparator);
+        CurrentDirectory = new Node(PathSeparator,null);
         Root = CurrentDirectory;
     }
 
@@ -114,21 +119,27 @@ public class FileSystem
     {
         if (!CurrentDirectory.Children.ContainsKey(name))
         {
-            CurrentDirectory.Children.Add(name, new Node(name));
+            CurrentDirectory.Children.Add(name, new Node(name,CurrentDirectory));
         }
         CurrentDirectory = CurrentDirectory.Children[name];
     }
 
     public void Parse(string command, List<string> output)
     {
+        string GetParamTrim(string st,int len)
+        {
+            
+            return st.PadRight(len).Remove(0, len).Trim();
+        }
+
         var cmd = command.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         if (cmd[1] == "cd")
         {
-            ParseCd(cmd[2], output);
+            ParseCd(GetParamTrim(command,5), output);
         }
         else if (cmd[1] == "ls")
         {
-            ParseLs(cmd[2], output);
+            ParseLs(GetParamTrim(command, 5), output);
         }
     }
 
