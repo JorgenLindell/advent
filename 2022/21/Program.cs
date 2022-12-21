@@ -2,7 +2,7 @@
 using common;
 
 
-//https://adventofcode.com/2022/day/15
+//https://adventofcode.com/2022/day/21
 internal class Program
 {
     private static readonly string _testData =
@@ -46,7 +46,7 @@ hmdt: 32"
     {
         var monkeys = LoadMonkeys(stream);
         var root = monkeys["root"];
-        var result = root.Result(null, 0);
+        var result = root.Result();
         Debug.WriteLine("root says:" + result);
 
         //monkeys.Values.OrderBy(x => x.Name).ForEach((m, i) => Debug.WriteLine(m));
@@ -55,15 +55,14 @@ hmdt: 32"
         root.Operation = "=";
         var bottom = monkeys["humn"];
 
-        // get call order upwards
-        var list = new List<string>();
-        while (bottom.Name != "root")
+        // get call order upwards that was registered during calculation
+        var stack = new Stack<string>();
+        while (bottom!=null && bottom.Name != "root")
         {
-            list.Add(bottom.Name);
+            stack.Push(bottom.Name);
             bottom = bottom.CalledBy;
         }
 
-        var stack = new Stack<string>(list);
         var target = root.NeedToBe(1, stack);
 
         Debug.WriteLine("target=" + target);
@@ -74,37 +73,37 @@ hmdt: 32"
         root = monkeys["root"];
         root.Operation = "=";
         monkeys["humn"].SetConstant(target);
-        result = root.Result(null, 0);
+        result = root.Result();
         Debug.WriteLine($"root says:{result}  meaning the solution {(result == 1 ? "succeeded":"failed")}");
         
     }
 
     private static Dictionary<string, Monkey> LoadMonkeys(TextReader stream)
     {
-        var monkeys = new Dictionary<string, Monkey>();
+        Monkey.Monkeys = new Dictionary<string, Monkey>();
         while (stream.ReadLine() is { } inpLine)
         {
-            var monkey = new Monkey(inpLine, monkeys);
-            monkeys[monkey.Name] = monkey;
+            var monkey = new Monkey(inpLine);
+            Monkey.Monkeys[monkey.Name] = monkey;
         }
 
-        return monkeys;
+        return Monkey.Monkeys;
     }
 }
 
 internal class Monkey
 {
-    private static Dictionary<string, Monkey> _monkeys=null!;
+    public static Dictionary<string, Monkey> Monkeys=null!;
     private readonly string _formula;
     private readonly List<(long? value, string? monkey)> _operands = new();
     private long? _result;
     public string Name { get; }
     public string Operation { get; set; } = "";
     public int Level { get; set; }
-    public Monkey CalledBy { get; set; } = null!;
-    public Monkey(string formula, Dictionary<string, Monkey> dictionary)
+    public Monkey? CalledBy { get; set; }
+
+    public Monkey(string formula)
     {
-        _monkeys = dictionary;
         _formula = formula;
         var parts = formula.Split(": ".ToCharArray(),
             StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
@@ -135,7 +134,7 @@ internal class Monkey
         _result = target;
     }
 
-    public long? Result(Monkey calledBy, int level)
+    public long? Result(Monkey? calledBy=null, int level=0)
     {
         CalledBy = calledBy;
         Level = level;
@@ -155,6 +154,10 @@ internal class Monkey
                 "/" => a / b,
                 _ => _result
             };
+        }
+        else
+        {
+            throw new InvalidDataException($"This monkey formula should have 2 operands:{_formula}");
         }
 
         return _result;
@@ -185,7 +188,7 @@ internal class Monkey
                 _ => nextNeeded
             };
 
-            return _monkeys[_operands[operIx].monkey!].NeedToBe(nextNeeded!.Value, callOrder);
+            return Monkeys[_operands[operIx].monkey!].NeedToBe(nextNeeded!.Value, callOrder);
         }
 
         var a = OperandValue(0);
@@ -203,7 +206,7 @@ internal class Monkey
             _ => nextNeeded
         };
 
-        return _monkeys[_operands[operIx].monkey!].NeedToBe(nextNeeded!.Value, callOrder);
+        return Monkeys[_operands[operIx].monkey!].NeedToBe(nextNeeded!.Value, callOrder);
     }
 
 
@@ -212,7 +215,7 @@ internal class Monkey
         if (index < _operands.Count)
             return _operands[index].value != null
                 ? _operands[index].value
-                : _monkeys[_operands[index].monkey!].Result(this, Level + 1);
+                : Monkeys[_operands[index].monkey!].Result(this, Level + 1);
         return null;
     }
 
