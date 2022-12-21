@@ -1,4 +1,6 @@
 ﻿
+using System.Diagnostics;
+using System.Net.Sockets;
 using common;
 
 
@@ -20,7 +22,7 @@ Valve JJ has flow rate=21; tunnel leads to valve II"
 
     private static void Main(string[] args)
     {
-        var debug = true;
+        var debug = false;
         FirstPart(GetDataStream(debug), debug);
         SecondPart(GetDataStream(debug), debug);
     }
@@ -32,99 +34,166 @@ Valve JJ has flow rate=21; tunnel leads to valve II"
 
     private static void SecondPart(TextReader stream, bool debug)
     {
+        Dictionary<string, Node> nodes;
+        nodes = LoadFile(stream, out string start);
+        var startNode = nodes["AA"];
+        var cache = new Dictionary<string, int>();
+        var productiveNodesCount = nodes.Values.Count(x => x.Flow > 0);
+
+        var result = MaxFlow(startNode, new HashSet<string>(), "", 26, false);
+        Debug.WriteLine("result=" + result);
+
+
+
+        int MaxFlow(Node current, HashSet<string> opened, string openedText, int timeLeft, bool elephant)
+        {
+            if (opened.Count == productiveNodesCount)
+                return 0;
+
+            if (timeLeft <= 0)
+            {
+                if (!elephant)
+                {
+                    return MaxFlow(startNode, opened, openedText, 26, true);
+                }
+                return 0;
+            }
+
+
+            var key = $"{current.Name};{openedText};{((char)timeLeft)};{elephant}";
+            if (cache.ContainsKey(key))
+                return cache[key];
+
+
+            var maxFlow = 0;
+            if (current.Flow > 0 && !opened.Contains(current.Name))
+            {
+                var currentOpened = opened.Append(current.Name).ToHashSet();
+                var currentOpenedText = string.Join(',', currentOpened.OrderBy(x=>x));
+                maxFlow = (current.Flow * (timeLeft - 1)) + MaxFlow(current, currentOpened, currentOpenedText, timeLeft - 1, elephant);
+            }
+            foreach (var edge in current.Edges.Values)
+            {
+                maxFlow = Math.Max(maxFlow, MaxFlow(edge.To, opened, openedText, timeLeft - 1, elephant));
+            }
+
+            cache[key] = maxFlow;
+            return maxFlow;
+        }
+
 
     }
 
 
     private static void FirstPart(TextReader stream, bool debug)
     {
-        var nodes = LoadFile(stream);
+        Dictionary<string, Node> nodes;
+        nodes = LoadFile(stream, out string start);
+        var startNode = nodes["AA"];
+        var maxTime = 30;
+        var cache = new Dictionary<string, int>();
 
-        foreach (var node in nodes.Values)
+        var result = MaxFlow(startNode, new List<string>(), maxTime);
+        Debug.WriteLine("result=" + result);
+
+
+
+        int MaxFlow(Node current, List<string> opened, int timeLeft)
         {
-            foreach (var edge1 in node.Edges.Values)
-            {
-                var startNode = edge1.To;
-                foreach (var edge2 in node.Edges.Values)
-                {
-                    var destNode = edge2.To;
-                    if (edge1.To != edge2.To)
-                    {
-                        var ne = new Edge(startNode, destNode, edge1.Steps + edge2.Steps, node);
-                        if (!startNode.Edges.ContainsKey(destNode.Name)
-                            || startNode.Edges[destNode.Name].Steps > ne.Steps)
-                        {
-                            startNode.Edges[destNode.Name] = ne;
-                        }
-                    }
+            if (timeLeft <= 0) return 0;
 
-                }
+            var key = $"{current.Name};{string.Join(',', opened)};{((char)timeLeft)}";
+            if (cache.ContainsKey(key))
+                return cache[key];
+
+
+            var maxFlow = 0;
+            if (current.Flow > 0 && !opened.Contains(current.Name))
+            {
+                var currentOpened = opened.Append(current.Name).OrderBy(x => x).ToList();
+
+                maxFlow = (current.Flow * (timeLeft - 1)) + MaxFlow(current, currentOpened, timeLeft - 1);
             }
-        }
 
-        private static Dictionary<string, Node> LoadFile(TextReader stream)
-        {
-            // 0     1  2    3   4   5    6      7    8    9   0   1     2
-            //Valve AA has flow rate=0; tunnels lead to valves DD, II, BB
-
-            var nodeList = new Dictionary<string, Node>();
-            while (stream.ReadLine() is { } inpLine)
+            foreach (var edge in current.Edges.Values)
             {
-                var parts = inpLine.Split(" =,;".ToCharArray(), StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-                var name = parts[1];
-                var flow = parts[5].ToInt()!.Value;
-                var connected = parts.Skip(10).ToList();
-                nodeList[name] = new Node(name, flow, connected);
-
+                maxFlow = Math.Max(maxFlow, MaxFlow(edge.To, opened, timeLeft - 1));
             }
-            nodeList.Values.ForEach((n, i) =>
-            {
-                n.Connect(nodeList);
-            });
-            return nodeList;
+
+            cache[key] = maxFlow;
+            return maxFlow;
         }
+
     }
 
-    internal class Node
+    private static Dictionary<string, Node> LoadFile(TextReader stream, out string first)
     {
-        private readonly List<string> _connected;
-        public string Name { get; }
-        public int Flow { get; }
-        public Dictionary<string, Edge> Edges { get; } = new();
-        public bool IsOpen { get; set; }
-        public int Visited { get; set; } = 0;
+        // 0     1  2    3   4   5    6      7    8    9   0   1     2
+        //Valve AA has flow rate=0; tunnels lead to valves DD, II, BB
 
-        public Node(string name, int flow, List<string> connected)
+        var nodeList = new Dictionary<string, Node>();
+        first = "";
+        while (stream.ReadLine() is { } inpLine)
         {
-            _connected = connected;
-            Name = name;
-            Flow = flow;
-        }
+            var parts = inpLine.Split(" =,;".ToCharArray(), StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            var name = parts[1];
+            var flow = parts[5].ToInt()!.Value;
+            var connected = parts.Skip(10).ToList();
+            nodeList[name] = new Node(name, flow, connected);
+            if (first == "") first = name;
 
-        public void Connect(Dictionary<string, Node> nodelist)
-        {
-            _connected.ForEach(s =>
-            {
-                var dest = nodelist[s];
-                Edges[dest.Name] = new Edge(this, dest, 1, dest);
-            });
         }
+        nodeList.Values.ForEach((n, i) =>
+        {
+            n.Connect(nodeList);
+        });
+        return nodeList;
     }
+}
 
-    internal class Edge
+internal class Node
+{
+    private readonly List<string> _connected;
+    public string Name { get; }
+    public int Flow { get; }
+    public Dictionary<string, Edge> Edges { get; } = new();
+    public int IsOpen { get; set; } = 0;
+    public int Visited { get; set; } = 0;
+
+    public Node(string name, int flow, List<string> connected)
     {
-        public Node From { get; }
-        public Node To { get; }
-        public int Steps { get; }
-        public Node FirstNode { get; }
-
-        public Edge(Node from, Node to, int steps, Node firstNode)
-        {
-            From = from;
-            To = to;
-            Steps = steps;
-            FirstNode = firstNode;
-        }
+        _connected = connected;
+        Name = name;
+        Flow = flow;
     }
+
+    public void Connect(Dictionary<string, Node> nodelist)
+    {
+        _connected.ForEach(s =>
+        {
+            var dest = nodelist[s];
+            Edges[dest.Name] = new Edge(this, dest, 1, dest);
+        });
+    }
+
+    public override string ToString() => $"{Name} [{Flow}]";
+}
+
+internal class Edge
+{
+    public Node From { get; }
+    public Node To { get; }
+    public int Steps { get; }
+    public Node FirstNode { get; }
+    public override string ToString() => $"{From.Name}->{To.Name} [{Steps}] ({To.Flow}) via {FirstNode.Name}";
+
+    public Edge(Node from, Node to, int steps, Node firstNode)
+    {
+        From = from;
+        To = to;
+        Steps = steps;
+        FirstNode = firstNode;
+    }
+}
 
 
