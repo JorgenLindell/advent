@@ -39,19 +39,35 @@ internal class Program
 
     private static void SecondPart(TextReader stream, bool debug)
     {
+        long avoided = 0;
+        long inspected = 0;
+        bool AvoidBacktracking(Stack<(long x, long y, long z)> lookedAt, (long x, long y, long z) x)
+        {
+            var already = lookedAt.Contains(x);
+            if (already) avoided++;
+            else inspected++;
+
+            return !already;
+        }
+
         var matrix = Load(stream);
+
+        // find the outside 
         var (min, max) = matrix.MinMax;
-        var midTop = (x: (min.x + max.x) / 2, y: (min.y + max.y) / 2, z: max.z + 1);
-        while (matrix.IsEmpty(midTop)) midTop.z--;
-        midTop.z++;
+        var aDrop = matrix.Values.First(x => x.Typ == Drop.DropType.Lava);
+        var dropCoord = aDrop.Coord;
+        var startPoint = dropCoord with { z = max.z + 1 };
+        while (matrix.IsEmpty(startPoint)) startPoint.z--;
+        startPoint.z++;
+
+        // cover the outside with gas
         var drop = new Drop(Drop.Gas);
-        matrix.Value(midTop, drop);
+        matrix.Value(startPoint, drop);
         var gasDrops = new List<Drop> { drop };
         var didAdd = true;
 
         while (didAdd)
         {
-            didAdd = false;
             var drops = gasDrops.ToList();
 
             drops.ForEach(x =>
@@ -61,8 +77,9 @@ internal class Program
             });
             didAdd = drops.Count != gasDrops.Count;
         }
-        var sumOfExposed = matrix.Values.Where(x=>x.Typ==Drop.DropType.Lava).Sum(x => x.AdjacentDrops.Count(y => y.Typ==Drop.DropType.Gas));
+        var sumOfExposed = matrix.Values.Where(x => x.Typ == Drop.DropType.Lava).Sum(x => x.AdjacentDrops.Count(y => y.Typ == Drop.DropType.Gas));
 
+        Debug.WriteLine("Inspected=" + inspected + " Avoided=" + avoided);
         Debug.WriteLine("Exposed outer sides=" + sumOfExposed);
 
         // Just curious: How many contained empty cells are there in total?
@@ -73,7 +90,7 @@ internal class Program
             .Select(x => x.Coord);
 
         Debug.WriteLine("Exposed to inside (for curiosity) =" + matrix.Values
-            .Where(x => x.Typ == Drop.Lava && x.AdjacentDrops.Count < 6).Sum(x=>6- x.AdjacentDrops.Count)
+            .Where(x => x.Typ == Drop.Lava && x.AdjacentDrops.Count < 6).Sum(x => 6 - x.AdjacentDrops.Count)
         );
 
         // and their positions?
@@ -82,7 +99,7 @@ internal class Program
         foreach (var nextToHole in nextToHoles)
         {
             var holes = matrix.GetAdjacentHoles(nextToHole);
-            holes.ForEach((x,_)=>holesSet.Add(x));
+            holes.ForEach((x, _) => holesSet.Add(x));
         }
 
         var anyNew = true;
@@ -90,8 +107,8 @@ internal class Program
         {
             anyNew = false;
             foreach (var hole in holesSet.ToList())
-            foreach (var newHole in matrix.GetAdjacentHoles(hole))
-                anyNew = holesSet.Add(newHole) || anyNew;
+                foreach (var newHole in matrix.GetAdjacentHoles(hole))
+                    anyNew = holesSet.Add(newHole) || anyNew;
         }
 
         Debug.WriteLine("Inside holes (for curiosity)  =" + holesSet.Count);
@@ -106,7 +123,7 @@ internal class Program
             lookedAt.Push(coord);
             var addedGas = false;
             var holes = matrix.GetAdjacentHoles(coord)
-                .Where(x => !lookedAt.Contains(x))
+                .Where(x => AvoidBacktracking(lookedAt, x))
                 .ToList();
 
             foreach (var hole in holes)
@@ -199,7 +216,7 @@ internal class Matrix : SparseMatrix<(long x, long y, long z), Drop>
         (-1, 0, 0), (+1, 0, 0)
     };
 
-    public new ((long x, long y, long z) Min, (long x, long y, long z) Max) MinMax => 
+    public new ((long x, long y, long z) Min, (long x, long y, long z) Max) MinMax =>
         base.MinMax((point, acc) =>
     {
         acc.Min.x = Math.Min(acc.Min.x, point.x);
@@ -228,7 +245,7 @@ internal class Matrix : SparseMatrix<(long x, long y, long z), Drop>
             if (!IsEmpty(p))
             {
                 var adjDrop = Value(p);
-                if (adjDrop == null) 
+                if (adjDrop == null)
                     continue;
                 drop.AdjacentDrops.Add(adjDrop);
                 adjDrop.AdjacentDrops.Add(drop);
@@ -238,7 +255,7 @@ internal class Matrix : SparseMatrix<(long x, long y, long z), Drop>
 
     public List<Drop> GetAdjacent((long x, long y, long z) coord)
     {
-        var adjacent=new List<Drop>();
+        var adjacent = new List<Drop>();
         foreach (var offset in Adjacency)
         {
             var p = Offset(coord, offset);
