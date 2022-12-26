@@ -4,12 +4,19 @@ using System.Collections.Generic;
 using System.Linq;
 
 namespace common.SparseMatrix;
-public class SparseMatrix<TKey,TValue>:IEnumerable<(TKey,TValue)>
-where TKey:struct
+
+public class SparseMatrix<TKey, TValue> : SparseMatrix<TKey, TValue, TKey>
+    where TKey : notnull
 {
-    private readonly Dictionary<TKey, Cell> _list = new();
+}
+public class SparseMatrix<TKey, TValue,TKeyBase> : IEnumerable<(TKey, TValue)>
+    where TKey : TKeyBase
+    where TKeyBase : notnull
+{
+
+    private readonly Dictionary<TKeyBase, Cell> _list = new();
     public IEnumerable<TValue> Values => _list.Values.Select(c => c.Value).Where(x => x != null).Cast<TValue>();
-    public IEnumerable<TKey> Keys => _list.Keys;
+    public IEnumerable<TKey> Keys => _list.Keys.Cast<TKey>();
 
     public Cell CellAt(TKey key)
     {
@@ -36,14 +43,14 @@ where TKey:struct
         _list[cell.Coordinate] = cell;
     }
 
-    public bool IsEmpty(TKey key)
+    public bool IsEmpty(TKeyBase key)
     {
         return !_list.ContainsKey(key);
     }
 
-    public (TKey Min, TKey Max) MinMax(Func<TKey,(TKey Min, TKey Max), (TKey Min, TKey Max)> func)
+    public (TKey Min, TKey Max) MinMax(Func<TKeyBase,(TKey Min, TKey Max), (TKey Min, TKey Max)> func)
     {
-        var first = _list.Keys.First();
+        var first =(TKey) _list.Keys.First();
         (TKey Min, TKey Max) acc= (first,first);
         _list.Keys.ForEach((x,i)=>acc = func(x, acc));
         return acc;
@@ -51,17 +58,17 @@ where TKey:struct
     public class Cell
     {
 
-        private readonly SparseMatrix<TKey,TValue?> _parent;
+        private readonly SparseMatrix<TKey,TValue, TKeyBase> _parent;
         private TValue? _value = default;
 
-        public Cell(TKey key, SparseMatrix<TKey, TValue> sparseMatrix)
+        public Cell(TKeyBase key, SparseMatrix<TKey, TValue, TKeyBase> sparseMatrix)
         {
             Coordinate = key;
             Value = default(TValue)!;
             _parent = sparseMatrix!;
         }
 
-        public TKey Coordinate { get; set; }
+        public TKeyBase Coordinate { get; set; }
         internal TValue? Value
         {
             get => _value;
@@ -80,7 +87,7 @@ where TKey:struct
 
     public IEnumerator<(TKey, TValue?)> GetEnumerator()
     {
-        return _list.Select(x => (x.Key, x.Value.Value)).GetEnumerator();
+        return _list.Select(x => ((TKey)x.Key, x.Value.Value)).GetEnumerator();
     }
 
     IEnumerator IEnumerable.GetEnumerator()

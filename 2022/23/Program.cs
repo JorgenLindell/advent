@@ -90,7 +90,7 @@ internal class Program
             Debug.Write($"{y:#0} ");
             for (long x = minX; x <= maxX; x++)
             {
-                if (Elf.IsOccupied((x, y)))
+                if (Elf.IsOccupied((Position)(x, y)))
                 {
                     Debug.Write("#");
                 }
@@ -135,7 +135,7 @@ internal class Program
             var line = lines[lineIx];
             for (var index = 0; index < line.Length; index++)
             {
-                Position pos = (index, lines.Count - lineIx);
+                Position pos = (Position)(index, lines.Count - lineIx);
                 var c = line[index];
                 if (c == '#')
                 {

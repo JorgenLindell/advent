@@ -1,14 +1,14 @@
 ﻿using System.Diagnostics;
-using System.Reflection.Metadata.Ecma335;
+using System.Text;
 using common;
-using common.SparseMatrix;
 
 
 //https://adventofcode.com/2022/day/22
 internal class Program
 {
     private static readonly string _testData =
-        @"        ...#
+@"
+        ...#
         .#..
         #...
         ....
@@ -22,235 +22,146 @@ internal class Program
         ......#.
 
 10R5L5R10L4R5L5"
-            .Replace("\r\n", "\n");
+            .Replace("\r\n", "\n").Substring(1);
+    static bool _debug = true;
 
     private static void Main(string[] args)
     {
-        var debug = true;
-        FirstPart(GetDataStream(debug), debug);
-        SecondPart(GetDataStream(debug), debug);
+        FirstPart();
+        SecondPart();
     }
 
-    private static TextReader GetDataStream(bool debug)
+    private static TextReader GetDataStream()
     {
-        return debug
+        return _debug
             ? StreamUtils.GetInputStream(testData: _testData)
             : StreamUtils.GetInputStream("input.txt");
     }
 
-    private static void SecondPart(TextReader stream, bool debug)
+    private static void SecondPart()
     {
-    }
+        var map = MonkeyMap.Load(GetDataStream);
+        PrintOut(map, false);
+        var gPos = new GlobalPosition(99, -55);
+        var lpos = map.Side(gPos);
+
+        var pos = lpos.Pos.PosEast;
+        Offset wasGoing = Offset.E;
+        Offset to = Offset.N;
+
+        var newLPos = map.FlipCoordinates(wasGoing, to, pos, out int rot);
+        gPos = map.GlobalPos("c", newLPos);
+        Debug.WriteLine($"{pos} {wasGoing}->{to} {rot} = {newLPos}  {gPos}");
+        //   foreach (var from in Enum.GetValues<Offset>())
+        //   {
+        //       foreach (var to in Enum.GetValues<Offset>())
+        //       {
+        //           Debug.WriteLine($"{pos} {from}->{to}={map.FlipCoordinates(from, to, pos)}");
+        //       }
+        //   }
 
 
-    private static void FirstPart(TextReader stream, bool debug)
-    {
-        var map = Load(stream);
-        Debug.WriteLine("Stopped after round= ");
-    }
+        var x = map.Value(new GlobalPosition(59, -100));
+        var t1 = x.Pos;
+        var t2 = x.PosInSide;
 
-    private static void PrintOut(MonkeyMap map)
-    {
-        var (minY, maxY, minX, maxX) = MinMaxElves(map);
-        Debug.WriteLine($"Printout  ({minX},{minY}) -> ({maxX},{maxY})  StartPos: {map.StartPos}");
-        for (long y = maxY; y >= minY; y--)
+        TransformEdges(map);
+
+        Walker me = new Walker(map.StartPos, Offset.E, map);
+        foreach (var instr in map.Instructions)
         {
-            Debug.Write($"{y,4} ");
-            for (long x = minX; x <= maxX; x++)
+            me.Execute(instr);
+        }
+
+        Debug.WriteLine($"Walker at = {me.Pos}");
+        //   me.Track.ForEach(
+        //       x => Debug.WriteLine(x));
+        var row = me.Pos.Y * -1;
+        var col = me.Pos.X + 1;
+        var faces = new[] { 3, 0, 1, 2, };
+        var face = faces[(int)me.Offset];
+
+        Debug.WriteLine($"Final answer 1 {row} {col} {face}: {(1000 * row + 4 * col + face)}");
+
+    }
+
+    private static void TransformEdges(MonkeyMap map)
+    {
+        PrintOut(map, true);
+        foreach (var (key, (horizontal, vertical)) in map.EdgeConnections)
+        {
+
+        }
+    }
+
+
+    private static void FirstPart()
+    {
+        var map = MonkeyMap.Load(GetDataStream);
+
+        Walker me = new Walker(map.StartPos, Offset.E, map);
+        foreach (var instr in map.Instructions)
+        {
+            me.Execute(instr);
+        }
+
+        Debug.WriteLine($"Walker at = {me.Pos}");
+        //PrintOut(map);
+        //   me.Track.ForEach(
+        //       x => Debug.WriteLine(x));
+        var row = me.Pos.Y * -1;
+        var col = me.Pos.X + 1;
+        var faces = new[] { 3, 0, 1, 2, };
+        var face = faces[(int)me.Offset];
+
+        Debug.WriteLine($"Final answer 1 {row} {col} {face}: {(1000 * row + 4 * col + face)}");
+    }
+
+    private static void PrintOut(MonkeyMap map, bool small = false)
+    {
+        void IndexLine(long from, long to, int i)
+        {
+            var sb = new StringBuilder("     ");
+            for (long x = from; x <= to; x += i)
+                sb.Append($"{Math.Abs(x) % 10}");
+            Debug.WriteLine(sb.ToString());
+        }
+
+        var (minY, maxY, minX, maxX) = MonkeyMap.MinMaxMap(map);
+        Debug.WriteLine($"Printout  ({minX},{minY}) -> ({maxX},{maxY})  StartPos: {map.StartPos}");
+        var incr = small ? 5 : 1;
+        for (long y = maxY; y >= minY; y -= incr)
+        {
+            if ((y % map.SideWidth) == 0)
+                IndexLine(minX, maxX, incr);
+            var sb = new StringBuilder($"{y,4} ");
+
+            for (long x = minX; x <= maxX; x += incr)
             {
-                Position position = (x, y);
+                var position =  new GlobalPosition(x, y);
                 if (!map.IsEmpty(position))
                 {
                     var tile = map.Value(position);
-                    Debug.Write(tile!.Symbol);
+                    if (small && tile.Typ != Tile.Types.Edge)
+                    {
+
+                        var symbol = tile.Side.Name;
+
+                        sb.Append(symbol);
+                    }
+                    else
+                    {
+                        sb.Append(tile!.Symbol);
+                    }
                 }
                 else
                 {
-                    Debug.Write(" ");
+                    sb.Append(" ");
                 }
+
+                if (small) sb.Append(" ");
             }
-            Debug.WriteLine("");
+            Debug.WriteLine(sb.ToString());
         }
-    }
-
-    private static (long minY, long maxY, long minX, long maxX) MinMaxElves(MonkeyMap map)
-    {
-        var firstElf = map.Values.First().Pos;
-        var minY = firstElf.Y;
-        var maxY = firstElf.Y;
-        var minX = firstElf.X;
-        var maxX = firstElf.X;
-        foreach (var elf in map.Values)
-        {
-            minY = Math.Min(minY, elf.Pos.Y);
-            maxY = Math.Max(maxY, elf.Pos.Y);
-            minX = Math.Min(minX, elf.Pos.X);
-            maxX = Math.Max(maxX, elf.Pos.X);
-        }
-
-        return (minY, maxY, minX, maxX);
-    }
-
-    private static MonkeyMap Load(TextReader stream)
-    {
-        var map = Tile.Map = new MonkeyMap();
-        var lineIx = 0;
-        var mapWidth = 0;
-        int start;
-        int end;
-        while (stream.ReadLine() is { } inpLine)
-        {
-            if (inpLine == "") break;
-            mapWidth = Math.Max(mapWidth, inpLine.Length);
-            lineIx--;
-            var ix = lineIx;
-            start = 0;
-            end = inpLine.Length;
-            int i = 0; for (; i < inpLine.Length && inpLine[i] == ' '; i++) { }
-
-            if (i < inpLine.Length)
-            {
-                start = i;
-            }
-            i = inpLine.Length - 1; for (; i > 0 && inpLine[i] == ' '; i--) { }
-            end = i;
-            if (ix == -1)
-                map.StartPos = new Position(start, ix);
-
-            Enumerable.Range(start, end - start + 1).ForEach(
-                (p, _) =>
-                {
-                    Position pos;
-                    if (inpLine[p] != '.')
-                    {
-                        pos = new Position(p, ix);
-                        map.Value(pos, new Tile(Tile.EWall, pos));
-                        return;
-                    }
-
-                    pos = new Position(p, ix);
-                    map.Value(pos, new Tile(Tile.EFree, pos));
-                });
-
-            var startPos = new Position(start - 1, ix);
-            while (map.IsEmpty(startPos.PosEast))
-                startPos = startPos.PosEast;
-
-            var endPos = new Position(end + 1, ix);
-            while (map.IsEmpty(endPos.PosWest))
-                endPos = endPos.PosWest;
-
-            map.Value(startPos, new Tile(Tile.EEdge, startPos, endPos));
-            map.Value(endPos, new Tile(Tile.EEdge, endPos, startPos));
-        }
-        start = (int)map.Values.Min(x => x.Pos.X);
-        end = (int)map.Values.Max(x => x.Pos.X);
-        var last = (int)map.Values.Min(x => x.Pos.Y);
-        for (int x = start + 1; x < end; x++)
-        {
-            var startPos = new Position(x, 0);
-            while (map.IsEmpty(startPos.PosSouth)
-                   ||map.Value(startPos.PosSouth)!.Typ==Tile.Types.Edge)
-                startPos = startPos.PosSouth;
-            var endPos = new Position(x, last - 1);
-            while (map.IsEmpty(endPos.PosNorth)
-                   || map.Value(endPos.PosNorth)!.Typ == Tile.Types.Edge)
-                endPos = endPos.PosNorth;
-            map.Value(startPos, new Tile(Tile.EEdge, startPos, endPos));
-            map.Value(endPos, new Tile(Tile.EEdge, endPos, startPos));
-        }
-        Debug.WriteLine($"Read lines={(-lineIx) - 1}");
-        PrintOut(map);
-        var instructionLine = stream.ReadLine();
-        var str = "";
-        foreach (var c in "" + instructionLine)
-        {
-            if (c.In('R', 'L'))
-            {
-                map.Instructions.Add(new Instruction(str.ToInt()!.Value, c));
-                str = "";
-            }
-            else
-            {
-                str += c;
-            }
-
-        }
-        return map;
-    }
-}
-
-internal class Instruction
-{
-    public enum Rotate{ Left=-1, Right=+1}
-    public int Steps { get; }
-    public Rotate Turn { get; }
-
-    public Instruction(int steps, char turn)
-    {
-        Steps = steps;
-        Turn = turn == 'L' ? Rotate.Left : Rotate.Right;
-    }
-
-    public override string ToString() => $"{Steps} {Turn}";
-}
-
-internal class Tile
-{
-
-    public static MonkeyMap Map { get; set; }
-    public Position Pos { get; private set; }
-    public Types Typ { get; }
-
-    public Tile(Types typ, Position pos, Position endPos)
-    {
-        Pos = pos;
-        Typ = typ;
-
-        Map.AddEdge(pos, endPos);
-    }
-    public Tile(Types typ, Position pos)
-    {
-        Pos = pos;
-        Typ = typ;
-    }
-
-    public enum Types
-    {
-        None,
-        Edge,
-        Wall
-    }
-    public static Types EEdge => Types.Edge;
-    public static Types EWall => Types.Wall;
-    public static Types EFree => Types.None;
-
-    public string Symbol => Typ == EEdge ? "E" : Typ == EWall ? "#" : Typ == EFree ? "." : "?";
-}
-
-internal class MonkeyMap : SparseMatrix<Position, Tile>
-{
-    public List<Instruction> Instructions { get; } = new();
-    public Dictionary<Position, (Position Horizontal, Position Vertical)> EdgeConnections { get; } = new();
-    public Position StartPos { get; set; }
-
-    public void AddEdge(Position pos, Position endPos)
-    {
-        if (!EdgeConnections.ContainsKey(pos))
-            EdgeConnections[pos] = default;
-        var connect = EdgeConnections[pos];
-        if (pos.X == endPos.X)
-        {
-            connect.Horizontal = endPos;
-        }
-        else if (pos.Y == endPos.Y)
-        {
-            connect.Vertical = endPos;
-        }
-        else
-        {
-            throw new InvalidDataException("Inconsistent edge");
-        }
-        EdgeConnections[pos] = connect;
     }
 }
