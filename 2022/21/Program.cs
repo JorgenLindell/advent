@@ -132,7 +132,8 @@ internal class Monkey
         }
     }
 
-    public string Formula => _operands[0].MonkeyName + Operation + _operands[1].MonkeyName;
+    public string Formula =>
+        $"{_operands[0].MonkeyName}{(_operands.Count > 1 ? Operation + _operands[1].MonkeyName : _result)}";
 
 
     public void SetConstant(long value)
