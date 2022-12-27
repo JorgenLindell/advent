@@ -46,10 +46,9 @@ hmdt: 32"
     {
         var monkeys = LoadMonkeys(stream);
         var root = monkeys["root"];
-        var result = root.Result();
+        var result = root.Result(); // try to evaluate to save call order
         Debug.WriteLine("root says:" + result);
 
-        //monkeys.Values.OrderBy(x => x.Name).ForEach((m, i) => Debug.WriteLine(m));
 
         // part 2
         root.Operation = "=";
@@ -60,7 +59,7 @@ hmdt: 32"
         while (bottom!=null && bottom.Name != "root")
         {
             stack.Push(bottom.Name);
-            bottom = bottom.CalledBy;
+            bottom = bottom.CalledBy; // was noted during first evaluation
         }
 
         var target = root.NeedToBe(1, stack);
@@ -94,50 +93,58 @@ hmdt: 32"
 internal class Monkey
 {
     public static Dictionary<string, Monkey> Monkeys=null!;
-    private readonly string _formula;
-    private readonly List<(long? value, string? monkey)> _operands = new();
+    private readonly List<(long? Value, string? MonkeyName)> _operands = new();
     private long? _result;
     public string Name { get; }
     public string Operation { get; set; } = "";
-    public int Level { get; set; }
-    public Monkey? CalledBy { get; set; }
+    public int Level { get; set; } // not essential, just for debug
+    public Monkey? CalledBy { get; set; } //save who was asking for value. Assuming only one is asking.
 
     public Monkey(string formula)
     {
-        _formula = formula;
+    //root: pppw + sjmn
+    //dbpl: 5
+
         var parts = formula.Split(": ".ToCharArray(),
             StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
         Name = parts[0];
-        ParseValue(1);
+        ParseValue(parts[1]);
         if (parts.Length < 3)
-        {
-            _result = _operands[0].value;
+        { 
+            //value only given
+            _result = _operands[0].Value;
         }
         else
         {
+            // formula given
             Operation = parts[2];
-            ParseValue(3);
+            ParseValue(parts[3]);
         }
 
-        void ParseValue(int i)
+        // local
+        void ParseValue( string part)
         {
-            if (parts[i].ToLong().HasValue)
-                _operands.Add((value: parts[i].ToLong(), monkey: null));
+            //Add value or monkey name to operands
+            if (part.ToLong().HasValue)
+                _operands.Add((Value: part.ToLong(), MonkeyName: null));
             else
-                _operands.Add((value: null, monkey: parts[i]));
+                _operands.Add((Value: null, MonkeyName: part));
         }
     }
 
+    public string Formula => _operands[0].MonkeyName + Operation + _operands[1].MonkeyName;
 
-    public void SetConstant(long target)
+
+    public void SetConstant(long value)
     {
-        _result = target;
+        _result = value;
     }
 
     public long? Result(Monkey? calledBy=null, int level=0)
     {
-        CalledBy = calledBy;
+        CalledBy = calledBy; //who is asking
         Level = level;
+
         if (_result != null)
             return _result;
 
@@ -157,11 +164,12 @@ internal class Monkey
         }
         else
         {
-            throw new InvalidDataException($"This monkey formula should have 2 operands:{_formula}");
+            throw new InvalidDataException($"This monkey formula should have 2 operands:{Formula}");
         }
 
         return _result;
     }
+
 
     public long NeedToBe(long targetValue, Stack<string> callOrder)
     {
@@ -169,7 +177,7 @@ internal class Monkey
             return targetValue;
 
         var nextMonkey = callOrder.Pop();
-        var operIx = _operands.First().monkey == nextMonkey ? 0 : 1;
+        var operIx = _operands.First().MonkeyName == nextMonkey ? 0 : 1;
         long? nextNeeded = 0;
         if (operIx == 0)
         {
@@ -188,7 +196,7 @@ internal class Monkey
                 _ => nextNeeded
             };
 
-            return Monkeys[_operands[operIx].monkey!].NeedToBe(nextNeeded!.Value, callOrder);
+            return Monkeys[_operands[operIx].MonkeyName!].NeedToBe(nextNeeded!.Value, callOrder);
         }
 
         var a = OperandValue(0);
@@ -206,21 +214,21 @@ internal class Monkey
             _ => nextNeeded
         };
 
-        return Monkeys[_operands[operIx].monkey!].NeedToBe(nextNeeded!.Value, callOrder);
+        return Monkeys[_operands[operIx].MonkeyName!].NeedToBe(nextNeeded!.Value, callOrder);
     }
 
 
     private long? OperandValue(int index)
     {
         if (index < _operands.Count)
-            return _operands[index].value != null
-                ? _operands[index].value
-                : Monkeys[_operands[index].monkey!].Result(this, Level + 1);
+            return _operands[index].Value != null
+                ? _operands[index].Value // has already a value
+                : Monkeys[_operands[index].MonkeyName!].Result(this, Level + 1); // calculate value
         return null;
     }
 
     public override string ToString()
     {
-        return $"{_formula}  {OperandValue(0)} {Operation} {OperandValue(1)}  {Level} {CalledBy?.Name}";
+        return $"{Formula}  {OperandValue(0)} {Operation} {OperandValue(1)}  {Level} {CalledBy?.Name}";
     }
 }
