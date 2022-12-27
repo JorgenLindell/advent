@@ -65,8 +65,11 @@ public class PositionBase : IEquatable<PositionBase>
         return (p.X, p.Y);
     }
 
-    public static bool operator ==(PositionBase left, PositionBase right)
+    public static bool operator ==(PositionBase? left, PositionBase? right)
     {
+        
+        if (ReferenceEquals(left, right))
+            return true;
         return left.Equals(right);
     }
 
@@ -74,6 +77,16 @@ public class PositionBase : IEquatable<PositionBase>
     {
         return !left.Equals(right);
     }
+
+    public bool Outside(PositionBase min, PositionBase max)
+    {
+        return (X < min.X || X > max.X || Y < min.Y || Y > max.Y);
+    }
+    public bool Outside((PositionBase min, PositionBase max) limits)
+    {
+        return Outside(limits.min,limits.max);
+    }
+   
 }
 
 
@@ -134,6 +147,20 @@ public class Position<TSubType> : PositionBase, IEquatable<Position<TSubType>>
     public Position<TSubType> PosSouthWest => this + SouthWest;
     public Position<TSubType> PosSouthEast => this + SouthEast;
 
+    public Position<TSubType> Wrap(PositionBase min, PositionBase max)
+    {
+        var pos = new Position<TSubType>(this);
+        if (pos.X < min.X) pos.X = max.X;
+        if (pos.X > max.X) pos.X = min.X;
+        if (pos.Y < min.Y) pos.Y = min.Y;
+        if (pos.Y > max.Y) pos.Y = max.Y;
+        return pos;
+    }
+    public Position<TSubType> Wrap((PositionBase min, PositionBase max) limits)
+    {
+        return Wrap(limits.min, limits.max);
+
+    }
 
 
     // Conversions
@@ -198,6 +225,7 @@ public class Position<TSubType> : PositionBase, IEquatable<Position<TSubType>>
             throw new InvalidDataException("HashCode was used and changed");
         return hashCode;
     }
+
 }
 
 public class Position : Position<Position>

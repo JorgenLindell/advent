@@ -1,13 +1,10 @@
-﻿using System;
+﻿using System.Collections.Generic;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
-using System.Numerics;
-using System.Runtime.CompilerServices;
-using System.Transactions;
+using System.Text;
 using common;
 
 
-//https://adventofcode.com/2022/day/25
+//https://adventofcode.com/2022/day/20
 internal class Program
 {
     private static readonly string _testData =
@@ -38,6 +35,38 @@ internal class Program
 
     private static void SecondPart(Func<TextReader> getStream)
     {
+        Debug.WriteLine("============================= Part 2 ======================");
+        var encryptionKey = 811589153L;
+        var numberOfMix = 10;
+        var lines = Load(getStream());
+
+        var list = new DoubleLinkedList();
+        foreach (var line in lines)
+        {
+            list.Add(line.ToLong()!.Value * encryptionKey);
+        }
+
+        var verify = list.AsEnumerable().ToList();
+        var equal = (verify.Count == lines.Count && verify.SequenceEqual(lines.Select(line => line.ToLong()!.Value)));
+        Debug.WriteLine($"List valid: {equal} Min value={verify.Min()} Max value={verify.Max()}");
+        if (list.Count < 50) Debug.WriteLine(list);
+        for (int i = 0; i < numberOfMix; i++)
+        {
+            Debug.WriteLine("===== Mix " + (i + 1));
+            list.MixOnce();
+        }
+
+
+        var node0 = list.NodeByValue(0);
+        var nodeAt1000 = node0.Go(1000);
+        var nodeAt2000 = node0.Go(2000);
+        var nodeAt3000 = node0.Go(3000);
+        Debug.WriteLine($"{nameof(nodeAt1000)} {nodeAt1000.Value}");
+        Debug.WriteLine($"{nameof(nodeAt2000)} {nodeAt2000.Value}");
+        Debug.WriteLine($"{nameof(nodeAt3000)} {nodeAt3000.Value}");
+
+        Debug.WriteLine("Sum lines= " + (nodeAt1000.Value + nodeAt2000.Value + nodeAt3000.Value));
+
     }
 
 
@@ -50,13 +79,24 @@ internal class Program
         {
             list.Add(line.ToLong()!.Value);
         }
+
+        var verify = list.AsEnumerable().ToList();
+        var equal = (verify.Count == lines.Count && verify.SequenceEqual(lines.Select(line => line.ToLong()!.Value)));
+        Debug.WriteLine($"List valid: {equal} Min value={verify.Min()} Max value={verify.Max()}");
+        if (list.Count < 50) Debug.WriteLine(list);
+
         list.MixOnce();
-        var nodeAt1000 = list.NodeAt(1000);
-        var nodeAt2000 = nodeAt1000.Go(1000);
-        var nodeAt3000 = nodeAt2000.Go(1000);
 
 
-        Debug.WriteLine("Sum lines="+(nodeAt1000.Value+ nodeAt2000.Value+ nodeAt3000.Value));
+        var node0 = list.NodeByValue(0);
+        var nodeAt1000 = node0.Go(1000);
+        var nodeAt2000 = node0.Go(2000);
+        var nodeAt3000 = node0.Go(3000);
+        Debug.WriteLine($"{nameof(nodeAt1000)} {nodeAt1000.Value}");
+        Debug.WriteLine($"{nameof(nodeAt2000)} {nodeAt2000.Value}");
+        Debug.WriteLine($"{nameof(nodeAt3000)} {nodeAt3000.Value}");
+
+        Debug.WriteLine("Sum lines= " + (nodeAt1000.Value + nodeAt2000.Value + nodeAt3000.Value));
     }
 
 
@@ -75,11 +115,11 @@ internal class DoubleLinkedList
 {
     private DoubleLinkedNode? _root;
     private readonly Dictionary<long, DoubleLinkedNode> _dict = new();
-    private readonly List<DoubleLinkedNode> _list = new();
-
+    private readonly List<DoubleLinkedNode> _orgList = new();
+    public int Count => _orgList.Count;
     public DoubleLinkedList()
     {
-        DoubleLinkedNode.List = this;
+        DoubleLinkedNode.List = this; // assuming only one instance...
         _root = null!;
     }
     public DoubleLinkedNode Add(long key)
@@ -94,34 +134,67 @@ internal class DoubleLinkedList
         else
         {
             _dict[key] = node;
-            _root!.Prev.InsertAfter(node);
+            InsertAfter(_root!.Prev, node);
         }
-        _list.Add(node);
+        _orgList.Add(node);
         return node;
     }
 
-    public DoubleLinkedNode NodeAt(long index) => _root?.Go(index) 
+    public DoubleLinkedNode NodeAt(long index) => _root?.Go(index)
                                                   ?? throw new InvalidDataException("List is empty");
     public void MixOnce()
     {
-        foreach (var node in _list)
+        foreach (var node in _orgList)
         {
+            var before = this.ToString();
             node.MoveSteps(node.Value);
+            if (Count < 50)
+            {
+                Debug.WriteLine($"\n{node.Value}");
+                Debug.WriteLine(before);
+                Debug.WriteLine(this);
+            }
         }
     }
 
-    public IEnumerable<long> ToList()
+    public IEnumerable<long> AsEnumerable()
     {
-        if (! (_root is{})) yield break;
+        if (!(_root is { })) yield break;
 
         var node = _root;
         do
         {
-            yield return node.Value;
+            var nodeValue = node.Value;
             node = node.Next;
+            yield return nodeValue;
         } while (node != _root);
-
     }
+    private void InsertAfter(DoubleLinkedNode oldNode, DoubleLinkedNode newNode)
+    {
+        if (newNode == oldNode.Prev)
+            return;
+
+        if (newNode.Prev != newNode)
+        {
+            newNode.Extract();
+        }
+
+        newNode.Next = oldNode.Next;
+        oldNode.Next.Prev = newNode;
+        oldNode.Next = newNode;
+        newNode.Prev = oldNode;
+    }
+
+    public DoubleLinkedNode NodeByValue(long value)
+    {
+        return _dict[value];
+    }
+    public override string ToString()
+    {
+        var list1 = AsEnumerable().ToList().Select(x => "" + x).StringJoin(", ") ?? "";
+        return list1 + " | " + list1 + " | " + list1;
+    }
+
     internal class DoubleLinkedNode
     {
         public long Value { get; }
@@ -142,57 +215,64 @@ internal class DoubleLinkedList
 
         public void Extract()
         {
+            if (List!._root == this)
+                List._root = this.Next; // To keep printout stable
             this.Prev.Next = this.Next;
             this.Next.Prev = this.Prev;
             this.Next = this;
             this.Prev = this;
         }
-        public void InsertAfter(DoubleLinkedNode node)
-        {
-            if (node == this.Prev)
-                return;
 
-            if (this.Prev != this)
-            {
-                Extract();
-            }
-
-            this.Next = node.Next;
-            node.Next.Prev = this;
-            this.Prev = node;
-            node.Next = this;
-
-        }
 
         public void MoveSteps(long steps)
         {
-            var toInsertAfter = Go(steps);
-            this.Extract();
-            this.InsertAfter(toInsertAfter);
+            if (steps != 0)
+            {
+                var starting = Next;
+                if (steps < 0)
+                {
+                    starting = Prev;
+                }
+                else
+                {
+                    steps -= 1;
+                }
+
+                this.Extract();
+                var count = List!.Count - 1;
+                DoubleLinkedNode current = starting;
+                steps %= count;
+
+                if (steps < 0)
+                    for (long i = 0; i < -steps; i++)
+                        current = current.Prev;
+                else if (steps > 0)
+                    for (long i = 0; i < steps; i++)
+                        current = current.Next;
+
+                List!.InsertAfter(current, this);
+            }
         }
 
         public DoubleLinkedNode Go(long steps)
         {
-            DoubleLinkedNode toInsertAfter=this;
+            steps %= List!.Count;
+            var current = this;
             if (steps < 0)
-            {
-                toInsertAfter = this.Prev;
                 for (long i = 0; i < -steps; i++)
-                {
-                    toInsertAfter = toInsertAfter.Prev;
-                }
-            }
+                    current = current.Prev;
             else if (steps > 0)
-            {
-                toInsertAfter = this;
-                for (int i = 0; i < steps; i++)
-                {
-                    toInsertAfter = toInsertAfter.Next;
-                }
-            }
+                for (long i = 0; i < steps; i++)
+                    current = current.Next;
 
-            return toInsertAfter;
+            return current;
+        }
+
+        public override string ToString()
+        {
+            return $"{Value} next:{Next.Value} prev:{Prev.Value}";
         }
     }
+
 }
 
