@@ -1,4 +1,6 @@
 ﻿
+namespace _24;
+
 internal class Walker
 {
     public Walker(IPosition startPos, IPosition endPos, int legs)

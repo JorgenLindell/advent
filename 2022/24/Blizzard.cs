@@ -1,4 +1,6 @@
-﻿internal class Blizzard
+﻿namespace _24;
+
+internal class Blizzard
 {
     private static int _counter;
 

@@ -2,6 +2,8 @@
 using System.Text;
 using common;
 
+namespace _24;
+
 internal class Matrix : DictionaryWithDuplicates<Position, Blizzard>
 {
     private readonly Dictionary<int, DictionaryWithDuplicates<Position, Blizzard>> _cachedBlizzardsAtTime = new();
