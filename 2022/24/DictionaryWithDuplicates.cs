@@ -1,4 +1,30 @@
-﻿internal class DictionaryWithDuplicates<TKey,TValue> : Dictionary<TKey,HashSet<TValue>> 
+﻿public static class DictionaryWithDuplicatesExtensions
+{
+    public static DictionaryWithDuplicates<TKey, TValue> ToDictionaryWithDuplicates<TInputValue, TKey, TValue>
+        (this IEnumerable<TInputValue> list, Func<TInputValue, TKey> keyFunc, Func<TInputValue, TValue> valueFunc)
+        where TKey : notnull
+    {
+
+        var newDict = new DictionaryWithDuplicates<TKey, TValue>();
+        foreach (var input in list)
+        {
+            newDict.Value(keyFunc(input), valueFunc(input));
+        }
+        return newDict;
+    }
+    public static DictionaryWithDuplicates<TKey, TValue> ToDictionaryWithDuplicates<TKey, TValue>(this IEnumerable<KeyValuePair<TKey, HashSet<TValue>>> other)
+        where TKey : notnull
+    {
+
+        var newDict = new DictionaryWithDuplicates<TKey, TValue>();
+        foreach (var input in other)
+        {
+            newDict[input.Key]=input.Value;
+        }
+        return newDict;
+    }
+}
+public class DictionaryWithDuplicates<TKey,TValue> : Dictionary<TKey,HashSet<TValue>> 
     where TKey : notnull
 
 {
@@ -16,19 +42,22 @@
                 this.Remove(pos);
         }
     }
-    public virtual void Value(TKey pos, TValue newValue)
+    public virtual HashSet<TValue> Value(TKey pos, TValue newValue)
     {
+        HashSet<TValue> list;
         if (!ContainsKey(pos))
         {
-            var list = new HashSet<TValue> { newValue };
+            list = new HashSet<TValue> { newValue };
             this[pos] = list;
         }
         else
         {
-            var list = this[pos];
+            list = this[pos];
             if (!list.Contains(newValue))
                 list.Add(newValue);
         }
+
+        return list;
     }
     public virtual HashSet<TValue> Value(TKey pos)
     {
@@ -39,6 +68,20 @@
         }
 
         return this[pos];
+    }
+
+    public new IEnumerable<TValue> Values
+    {
+        get
+        {
+            foreach (var element in this)
+            {
+                foreach (var value in element.Value)
+                {
+                    yield return value;
+                }
+            }
+        }
     }
 
 }

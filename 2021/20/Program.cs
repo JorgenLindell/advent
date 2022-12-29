@@ -95,7 +95,7 @@ namespace _20
             var line = "";
             while (reader.Peek() != -1 & (line = reader.ReadLine())?.Length > 2)
             {
-                enhancer += line.ReplaceLineEndings("");
+                enhancer += line!.ReplaceLineEndings("");
             }
             data.Enhancer = enhancer.Select(c => (c == '#' ? 1 : 0)).ToArray();
 

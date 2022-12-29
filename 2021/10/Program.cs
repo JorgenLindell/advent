@@ -156,7 +156,6 @@ namespace _10
         {
             public Parens BadParens;
             public string Message;
-            public int Pos;
             public ResultStatus Status;
             public Parens Expected { get; set; }
             public Stack<Parens> Completion { get; set; }

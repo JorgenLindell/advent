@@ -1,7 +1,7 @@
 ﻿internal class Tile
 {
 
-    public static MonkeyMap Map { get; set; }
+    public static MonkeyMap? Map { get; set; }
     public GlobalPosition Pos { get; private set; }
     public Types Typ { get; }
 

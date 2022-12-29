@@ -43,4 +43,5 @@
         intOffset %= Position.Offsets.Length;
         Offset = (Offset)(intOffset);
     }
+
 }

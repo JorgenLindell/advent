@@ -30,7 +30,7 @@ public class DebuggerTextWriter : TextWriter
         Debug.Write(value.ToString());
     }
 
-    public override void Write(string value)
+    public override void Write(string? value)
     {
         if (!_isOpen)
         {

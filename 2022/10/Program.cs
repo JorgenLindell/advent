@@ -319,7 +319,6 @@ public class AocProcessor
 
     public class Instruction
     {
-        private readonly int _cycles;
 
         public Instruction(string name, int cycles, int argcount,
             Action<InstructionState, AocProcessor, List<string>> action)

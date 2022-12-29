@@ -1,5 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
+using System.Linq;
 
 public enum Offset
 {
@@ -9,10 +12,27 @@ public enum Offset
     W
 }
 
-public class PositionBase : IEquatable<PositionBase>
+
+public interface IPosition
 {
-    public long X;
-    public long Y;
+    public long X { get; set; }
+    public long Y { get; set; }
+    bool Equals(object? obj);
+    int GetHashCode();
+    string ToString();
+    void Deconstruct(out long x, out long y);
+    bool Outside(IPosition min, IPosition max);
+    bool Outside((IPosition min, IPosition max) limits);
+    long ManhattanDistance(IPosition other);
+}
+
+public class PositionBase : IPosition, IEquatable<IPosition>, IEquatable<PositionBase>
+{
+    private int _previousHash = 0;
+    public long X { get; set; }
+    public long Y { get; set; }
+    public static bool NorthIsNegative { get; set; } = false;
+
 
     public PositionBase(long x, long y)
     {
@@ -25,9 +45,89 @@ public class PositionBase : IEquatable<PositionBase>
     {
     }
 
+    protected PositionBase(PositionBase pos)
+        : this(pos.X, pos.Y)
+    {
+    }
     protected PositionBase()
     {
     }
+    public override string ToString()
+    {
+        return $"({X},{Y})";
+    }
+
+    public void Deconstruct(out long x, out long y)
+    {
+        x = this.X;
+        y = this.Y;
+    }
+
+
+    public static implicit operator (long, long)(PositionBase p)
+    {
+        return (p.X, p.Y);
+    }
+
+
+    public static bool operator ==(PositionBase? left, PositionBase? right)
+    {
+
+        if (ReferenceEquals(left, right))
+            return true;
+        return left?.Equals(right) ?? false;
+    }
+
+    public static bool operator !=(PositionBase left, PositionBase right)
+    {
+        return !left.Equals(right);
+    }
+
+    public bool Outside(IPosition min, IPosition max)
+    {
+        return (X < min.X || X > max.X || Y < min.Y || Y > max.Y);
+    }
+    public bool Outside((IPosition min, IPosition max) limits)
+    {
+        return Outside(limits.min, limits.max);
+    }
+    public long ManhattanDistance(IPosition other) => Math.Abs(other.X - this.X) + Math.Abs(other.Y - this.Y);
+
+    public static PositionBase operator -(PositionBase p1, PositionBase p2)
+    {
+        return new PositionBase(p1.X - p2.X, p1.Y - p2.Y);
+    }
+
+    public static PositionBase operator +(PositionBase p1, PositionBase p2)
+    {
+        return new PositionBase(p1.X + p2.X, p1.Y + p2.Y);
+    }
+    public static PositionBase operator *(PositionBase p1, long factor)
+    {
+        return new PositionBase(p1.X * factor, p1.Y * factor);
+    }
+    public static PositionBase operator *(PositionBase p1, PositionBase factorPosition)
+    {
+        return new PositionBase(p1.X * factorPosition.X, p1.Y * factorPosition.Y);
+    }
+    public static PositionBase operator %(PositionBase p1, long factor)
+    {
+        return new PositionBase(p1.X % factor, p1.Y % factor);
+    }
+    public static PositionBase operator %(PositionBase p1, PositionBase factorPosition)
+    {
+        return new PositionBase(p1.X % factorPosition.X, p1.Y % factorPosition.Y);
+    }
+    public static PositionBase operator /(PositionBase p1, long factor)
+    {
+        return new PositionBase(p1.X / factor, p1.Y / factor);
+    }
+    public static PositionBase operator /(PositionBase p1, PositionBase factorPosition)
+    {
+        return new PositionBase(p1.X / factorPosition.X, p1.Y / factorPosition.Y);
+    }
+
+    // Equality
 
     public bool Equals(PositionBase? other)
     {
@@ -36,82 +136,78 @@ public class PositionBase : IEquatable<PositionBase>
         return X == other.X && Y == other.Y;
     }
 
+
+    public bool Equals(IPosition? other)
+    {
+        if (ReferenceEquals(null, other)) return false;
+        if (ReferenceEquals(this, other)) return true;
+        return X == other.X && Y == other.Y;
+    }
+
     public override bool Equals(object? obj)
     {
-        if (ReferenceEquals(null, obj)) return false;
-        if (ReferenceEquals(this, obj)) return true;
-        if (obj is PositionBase @base) return Equals(@base);
-        return false;
+        return ReferenceEquals(this, obj) || obj is PositionBase other && Equals(other);
     }
 
     public override int GetHashCode()
     {
-        return HashCode.Combine(X, Y);
+        var hashCode = HashCode.Combine(X, Y);
+        if (_previousHash != 0 && _previousHash != hashCode)
+            throw new InvalidOperationException("hashCode has changed");
+        return hashCode;
     }
 
-    public override string ToString()
-    {
-        return $"({X},{Y})";
-    }
-
-    public void Deconstruct(out long X, out long Y)
-    {
-        X = this.X;
-        Y = this.Y;
-    }
-
-    public static implicit operator (long, long)(PositionBase p)
-    {
-        return (p.X, p.Y);
-    }
-
-    public static bool operator ==(PositionBase? left, PositionBase? right)
-    {
-        
-        if (ReferenceEquals(left, right))
-            return true;
-        return left.Equals(right);
-    }
-
-    public static bool operator !=(PositionBase left, PositionBase right)
-    {
-        return !left.Equals(right);
-    }
-
-    public bool Outside(PositionBase min, PositionBase max)
-    {
-        return (X < min.X || X > max.X || Y < min.Y || Y > max.Y);
-    }
-    public bool Outside((PositionBase min, PositionBase max) limits)
-    {
-        return Outside(limits.min,limits.max);
-    }
-   
 }
 
 
-public class Position<TSubType> : PositionBase, IEquatable<Position<TSubType>>
+public abstract class Position<TSubType> : PositionBase
     where TSubType : Position<TSubType>, new()
 {
-    public static readonly Position<TSubType> North = new(0, +1);
-    public static readonly Position<TSubType> East = new(+1, 0);
-    public static readonly Position<TSubType> South = new(0, -1);
-    public static readonly Position<TSubType> West = new(-1, 0);
-    public static readonly Position<TSubType> NorthWest = North + West;
-    public static readonly Position<TSubType> NorthEast = North + East;
-    public static readonly Position<TSubType> SouthWest = South + West;
-    public static readonly Position<TSubType> SouthEast = South + East;
 
-    public static Position<TSubType>[] Offsets =
+    public static TSubType North { get; } = CreateSubtype(0, PositionBase.NorthIsNegative ? -1 : 1);
+    public static TSubType East { get; } = CreateSubtype(+1, 0);
+    public static TSubType South { get; } = CreateSubtype(0, PositionBase.NorthIsNegative ? 1 : -1);
+    public static TSubType West { get; } = CreateSubtype(-1, 0);
+    public static TSubType NorthWest { get; } = North + West;
+    public static TSubType NorthEast { get; } = North + East;
+    public static TSubType SouthWest { get; } = South + West;
+    public static TSubType SouthEast { get; } = South + East;
+
+    public TSubType PosNorth => this + North;
+    public TSubType PosSouth => this + South;
+    public TSubType PosWest => this + West;
+    public TSubType PosEast => this + East;
+    public TSubType PosNorthWest => this + NorthWest;
+    public TSubType PosNorthEast => this + NorthEast;
+    public TSubType PosSouthWest => this + SouthWest;
+    public TSubType PosSouthEast => this + SouthEast;
+
+    public TSubType Wrap(PositionBase min, PositionBase max)
+    {
+        var pos = CreateSubtype(this);
+        var width_ = ((max.X - min.X) + 1);
+        var height = ((max.Y - min.Y) + 1);
+
+        if (pos.X < min.X) pos.X = min.X + (((pos.X - min.X) % width_) + width_);
+        if (pos.X > max.X) pos.X = min.X + (((pos.X - min.X) % width_));
+        if (pos.Y < min.Y) pos.Y = min.Y + (((pos.Y - min.Y) % height) + height);
+        if (pos.Y > max.Y) pos.Y = min.Y + (((pos.Y - min.Y) % height));
+        return pos;
+    }
+
+    public TSubType Wrap((PositionBase min, PositionBase max) limits)
+    {
+        return Wrap(limits.min, limits.max);
+
+    }
+    public static TSubType[] Offsets { get; } =
     {
         North,
         East,
         South,
         West
     };
-
-
-    public static Position<TSubType>[] AllOffsets =
+    public static TSubType[] AllOffsets { get; } =
     {
         North,
         NorthEast,
@@ -123,6 +219,7 @@ public class Position<TSubType> : PositionBase, IEquatable<Position<TSubType>>
         NorthWest
     };
 
+
     public Position((long x, long y) coord)
         : base(coord)
     {
@@ -133,87 +230,51 @@ public class Position<TSubType> : PositionBase, IEquatable<Position<TSubType>>
     {
     }
 
-    protected Position()
+    public Position(PositionBase pos)
+        : base(pos)
     {
     }
 
-
-    public Position<TSubType> PosNorth => this + North;
-    public Position<TSubType> PosSouth => this + South;
-    public Position<TSubType> PosWest => this + West;
-    public Position<TSubType> PosEast => this + East;
-    public Position<TSubType> PosNorthWest => this + NorthWest;
-    public Position<TSubType> PosNorthEast => this + NorthEast;
-    public Position<TSubType> PosSouthWest => this + SouthWest;
-    public Position<TSubType> PosSouthEast => this + SouthEast;
-
-    public Position<TSubType> Wrap(PositionBase min, PositionBase max)
+    public Position()
     {
-        var pos = new Position<TSubType>(this);
-        if (pos.X < min.X) pos.X = max.X;
-        if (pos.X > max.X) pos.X = min.X;
-        if (pos.Y < min.Y) pos.Y = min.Y;
-        if (pos.Y > max.Y) pos.Y = max.Y;
-        return pos;
-    }
-    public Position<TSubType> Wrap((PositionBase min, PositionBase max) limits)
-    {
-        return Wrap(limits.min, limits.max);
-
     }
 
-
-    // Conversions
-    protected virtual TSubType FromBase<TSub>(TSub pos)
-        where TSub : Position<TSubType>
-    {
-        return pos.FromBase<TSubType>(pos);
-    }
-
-    public static implicit operator Position<TSubType>((long, long) tuple)
-    {
-        return new Position<TSubType>(tuple);
-    }
-
-    public static implicit operator TSubType(Position<TSubType> tuple)
+    private static TSubType CreateSubtype(long p1X, long p1Y)
     {
         var x = new TSubType
         {
-            X = tuple.X,
-            Y = tuple.Y
+            X = p1X,
+            Y = p1Y
         };
-        return x.FromBase(x);
+        return x;
     }
+    private static TSubType CreateSubtype(PositionBase pos)
+        => CreateSubtype(pos.X, pos.Y);
+
+    // Conversions
+    public static implicit operator Position<TSubType>((long, long) tuple)
+        => CreateSubtype(tuple.Item1, tuple.Item2);
+    public static implicit operator TSubType(Position<TSubType> pos)
+        => CreateSubtype(pos);
 
 
     // Math
     public static Position<TSubType> operator -(Position<TSubType> p1, Position<TSubType> p2)
-    {
-        return new Position<TSubType>(p1.X - p2.X, p1.Y - p2.Y);
-    }
-
+        => CreateSubtype(p1.X - p2.X, p1.Y - p2.Y);
     public static Position<TSubType> operator +(Position<TSubType> p1, Position<TSubType> p2)
-    {
-        return new Position<TSubType>(p1.X + p2.X, p1.Y + p2.Y);
-    }
-
-
-    // Equality
-
-    public bool Equals(PositionBase other)
-    {
-        return X == other.X && Y == other.Y;
-    }
-
-    public bool Equals(Position<TSubType>? other)
-    {
-        return X == other?.X && Y == other.Y;
-    }
-
-    public override bool Equals(object? obj)
-    {
-        return obj is PositionBase other && Equals(other);
-    }
+        => CreateSubtype(p1.X + p2.X, p1.Y + p2.Y);
+    public static Position<TSubType> operator *(Position<TSubType> p1, long factor)
+        => CreateSubtype(p1.X * factor, p1.Y * factor);
+    public static Position<TSubType> operator *(Position<TSubType> p1, Position<TSubType> factorPosition)
+        => CreateSubtype(p1.X * factorPosition.X, p1.Y * factorPosition.Y);
+    public static Position<TSubType> operator %(Position<TSubType> p1, long factor)
+        => CreateSubtype(p1.X % factor, p1.Y % factor);
+    public static Position<TSubType> operator %(Position<TSubType> p1, Position<TSubType> factorPosition)
+        => CreateSubtype(p1.X % factorPosition.X, p1.Y % factorPosition.Y);
+    public static Position<TSubType> operator /(Position<TSubType> p1, long factor)
+        => CreateSubtype(p1.X / factor, p1.Y / factor);
+    public static Position<TSubType> operator /(Position<TSubType> p1, Position<TSubType> factorPosition)
+        => CreateSubtype(p1.X / factorPosition.X, p1.Y / factorPosition.Y);
 
     private int _previousHash = 0;
     public override int GetHashCode()
@@ -226,6 +287,11 @@ public class Position<TSubType> : PositionBase, IEquatable<Position<TSubType>>
         return hashCode;
     }
 
+    public static IEnumerable<Position> RawNeighbors(Position position)
+    {
+        return Position.Offsets
+            .Select(o => (new Position(position + o)));
+    }
 }
 
 public class Position : Position<Position>
@@ -234,18 +300,12 @@ public class Position : Position<Position>
     {
     }
 
-    public Position(Position pos) : base(pos.X, pos.Y)
+    public Position(PositionBase pos) : base(pos.X, pos.Y)
     {
     }
 
-    public Position()
+    public Position() : base()
     {
-    }
-
-
-    protected override Position FromBase<TSub>(TSub pos)
-    {
-        return new Position(pos.X, pos.Y);
     }
 }
 
@@ -255,7 +315,7 @@ public class LocalPosition : Position<LocalPosition>
     {
     }
 
-    public LocalPosition(LocalPosition pos) : base(pos)
+    public LocalPosition(PositionBase pos) : base(pos)
     {
     }
 
@@ -263,29 +323,11 @@ public class LocalPosition : Position<LocalPosition>
     {
     }
 
-    public static implicit operator LocalPosition((long x, long y) pos)
-    {
-        return new LocalPosition(pos.x, pos.y);
-    }
-
-    public static explicit operator Position(LocalPosition pos)
-    {
-        return new Position(pos.X, pos.Y);
-    }
-
-    public static explicit operator LocalPosition(Position pos)
-    {
-        return new LocalPosition(pos.X, pos.Y);
-    }
-
-    protected override LocalPosition FromBase<TSub>(TSub pos)
-    {
-        return new LocalPosition(pos.X, pos.Y);
-    }
 }
 
 public class GlobalPosition : Position<GlobalPosition>
 {
+
     public GlobalPosition(long x, long y) : base(x, y)
     {
     }
@@ -293,21 +335,10 @@ public class GlobalPosition : Position<GlobalPosition>
     public GlobalPosition()
     {
     }
-
-    public static explicit operator Position(GlobalPosition pos)
+    public GlobalPosition(PositionBase pos) : base(pos)
     {
-        return new Position(pos.X, pos.Y);
     }
 
-    public static explicit operator GlobalPosition(Position pos)
-    {
-        return new GlobalPosition(pos.X, pos.Y);
-    }
-
-    protected override GlobalPosition FromBase<TSub>(TSub pos)
-    {
-        return new GlobalPosition(pos.X, pos.Y);
-    }
 }
 
 public class SidePosition : Position<SidePosition>
@@ -320,18 +351,4 @@ public class SidePosition : Position<SidePosition>
     {
     }
 
-    public static explicit operator Position(SidePosition pos)
-    {
-        return new Position(pos.X, pos.Y);
-    }
-
-    public static explicit operator SidePosition(Position pos)
-    {
-        return new SidePosition(pos.X, pos.Y);
-    }
-
-    protected override SidePosition FromBase<TSub>(TSub pos)
-    {
-        return new SidePosition(pos.X, pos.Y);
-    }
 }

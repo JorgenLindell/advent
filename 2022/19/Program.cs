@@ -154,8 +154,8 @@ internal class Program
 internal class Elf
 {
     private static int _elfSequence;
-    private static Dictionary<string, Elf> _elves;
-    private static Dictionary<Position, Elf> _elvesPositions;
+    private static Dictionary<string, Elf>? _elves=new();
+    private static Dictionary<Position, Elf>? _elvesPositions=new();
 
     public Elf(Position pos)
     {
@@ -168,7 +168,7 @@ internal class Elf
 
     public static Dictionary<string, Elf> Elves
     {
-        get => _elves;
+        get => _elves!;
         set
         {
             _elves = value;

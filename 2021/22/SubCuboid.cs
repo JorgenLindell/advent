@@ -4,8 +4,6 @@ namespace _22;
 
 public class SubCuboid : Cuboid
 {
-    private ECuboidState _state;
-
     public SubCuboid(Cuboid parent, int x1, int x2, int y1, int y2, int z1, int z2)
         : base(x1, x2, y1, y2, z1, z2)
     {

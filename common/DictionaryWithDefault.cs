@@ -14,9 +14,9 @@ namespace common
     /// </remarks>
     /// <typeparam name="TKey"></typeparam>
     /// <typeparam name="TValue"></typeparam>
-    public class DictionaryWithDefault<TKey, TValue> : Dictionary<TKey, TValue>
+    public class DictionaryWithDefault<TKey, TValue> : Dictionary<TKey, TValue> where TKey : notnull
     {
-        private readonly Func<TKey, TValue> _defaultValue = null;
+        private readonly Func<TKey, TValue> _defaultValue ;
 
         /// <summary>
         /// 
@@ -122,7 +122,7 @@ namespace common
         /// <typeparam name="TSource"></typeparam>
         /// <typeparam name="TKey"></typeparam>
         /// <returns></returns>
-        public static DictionaryWithDefault<TKey, TSource> ToDictionaryWithDefault<TSource, TKey>(this IEnumerable<TSource> source, Func<TSource, TKey> keySelector, Func<TKey, TSource> defaultFunc)
+        public static DictionaryWithDefault<TKey, TSource> ToDictionaryWithDefault<TSource, TKey>(this IEnumerable<TSource> source, Func<TSource, TKey> keySelector, Func<TKey, TSource> defaultFunc) where TKey : notnull
         {
             return ToDictionaryWithDefault<TSource, TKey, TSource>(source, keySelector, IdentityFunction<TSource>.Instance, null);
         }
@@ -137,7 +137,7 @@ namespace common
         /// <typeparam name="TSource"></typeparam>
         /// <typeparam name="TKey"></typeparam>
         /// <returns></returns>
-        public static DictionaryWithDefault<TKey, TSource> ToDictionaryWithDefault<TSource, TKey>(this IEnumerable<TSource> source, Func<TSource, TKey> keySelector, Func<TKey, TSource> defaultFunc, IEqualityComparer<TKey> comparer)
+        public static DictionaryWithDefault<TKey, TSource> ToDictionaryWithDefault<TSource, TKey>(this IEnumerable<TSource> source, Func<TSource, TKey> keySelector, Func<TKey, TSource> defaultFunc, IEqualityComparer<TKey> comparer) where TKey : notnull
         {
             return ToDictionaryWithDefault<TSource, TKey, TSource>(source, keySelector, IdentityFunction<TSource>.Instance, defaultFunc, comparer);
         }
@@ -153,7 +153,7 @@ namespace common
         /// <typeparam name="TKey"></typeparam>
         /// <typeparam name="TElement"> </typeparam>
         /// <returns></returns>
-        public static DictionaryWithDefault<TKey, TElement> ToDictionaryWithDefault<TSource, TKey, TElement>(this IEnumerable<TSource> source, Func<TSource, TKey> keySelector, Func<TSource, TElement> elementSelector, Func<TKey, TElement> defaultFunc)
+        public static DictionaryWithDefault<TKey, TElement> ToDictionaryWithDefault<TSource, TKey, TElement>(this IEnumerable<TSource> source, Func<TSource, TKey> keySelector, Func<TSource, TElement> elementSelector, Func<TKey, TElement> defaultFunc) where TKey : notnull
         {
             return ToDictionaryWithDefault<TSource, TKey, TElement>(source, keySelector, elementSelector, defaultFunc, null);
         }
@@ -170,7 +170,7 @@ namespace common
         /// <typeparam name="TKey"></typeparam>
         /// <typeparam name="TElement"> </typeparam>
         /// <returns></returns>
-        public static DictionaryWithDefault<TKey, TElement> ToDictionaryWithDefault<TSource, TKey, TElement>(this IEnumerable<TSource> source, Func<TSource, TKey> keySelector, Func<TSource, TElement> elementSelector, Func<TKey, TElement> defaultFunc, IEqualityComparer<TKey> comparer)
+        public static DictionaryWithDefault<TKey, TElement> ToDictionaryWithDefault<TSource, TKey, TElement>(this IEnumerable<TSource> source, Func<TSource, TKey> keySelector, Func<TSource, TElement> elementSelector, Func<TKey, TElement> defaultFunc, IEqualityComparer<TKey> comparer) where TKey : notnull
         {
             if (source == null) throw new ArgumentNullException("source");
             if (keySelector == null) throw new ArgumentNullException("keySelector");
@@ -193,7 +193,7 @@ namespace common
     /// <typeparam name="TKey1"></typeparam>
     /// <typeparam name="TKey2"></typeparam>
     /// <typeparam name="TValue"></typeparam>
-    public class DictionaryWithDefault<TKey1, TKey2, TValue> : DictionaryWithDefault<TKey1, DictionaryWithDefault<TKey2, TValue>>
+    public class DictionaryWithDefault<TKey1, TKey2, TValue> : DictionaryWithDefault<TKey1, DictionaryWithDefault<TKey2, TValue>> where TKey1 : notnull where TKey2 : notnull
     {
         /// <summary>
         ///  dictionary of dictionary of dictionary of value
@@ -219,7 +219,7 @@ namespace common
     /// <typeparam name="TKey2"></typeparam>
     /// <typeparam name="TKey3"></typeparam>
     /// <typeparam name="TValue"></typeparam>
-    public class DictionaryWithDefault<TKey1, TKey2, TKey3, TValue> : DictionaryWithDefault<TKey1, TKey2, DictionaryWithDefault<TKey3, TValue>>
+    public class DictionaryWithDefault<TKey1, TKey2, TKey3, TValue> : DictionaryWithDefault<TKey1, TKey2, DictionaryWithDefault<TKey3, TValue>> where TKey1 : notnull where TKey2 : notnull where TKey3 : notnull
     {
         /// <summary>
         /// 
@@ -246,6 +246,7 @@ namespace common
     /// <typeparam name="TKey4"></typeparam>
     /// <typeparam name="TValue"></typeparam>
     public class DictionaryWithDefault<TKey1, TKey2, TKey3, TKey4, TValue> : DictionaryWithDefault<TKey1, TKey2, TKey3, DictionaryWithDefault<TKey4, TValue>>
+        where TKey1 : notnull where TKey2 : notnull where TKey3 : notnull where TKey4 : notnull 
     {
         /// <summary>
         /// 

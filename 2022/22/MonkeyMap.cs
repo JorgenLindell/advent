@@ -4,7 +4,7 @@ using common.SparseMatrix;
 
 internal class MonkeyMap : SparseMatrix<GlobalPosition, Tile, Position<GlobalPosition>>
 {
-    public GlobalPosition StartPos { get; set; }
+    public GlobalPosition? StartPos { get; set; }
     public int Width { get; set; }
     public int Height { get; set; }
     public int SideWidth { get; set; } = 50;

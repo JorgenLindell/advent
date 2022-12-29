@@ -80,7 +80,6 @@ public class IntCodeMachine2019
 
     private static long InputBox()
     {
-        long? res = null;
         string? s = "";
         do
         {

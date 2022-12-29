@@ -85,9 +85,9 @@ public class SparseMatrix<TKey, TValue,TKeyBase> : IEnumerable<(TKey, TValue)>
         }
     }
 
-    public IEnumerator<(TKey, TValue?)> GetEnumerator()
+    public IEnumerator<(TKey, TValue)> GetEnumerator()
     {
-        return _list.Select(x => ((TKey)x.Key, x.Value.Value)).GetEnumerator();
+        return _list.Select(x => ((TKey)x.Key, x.Value.Value!)).GetEnumerator();
     }
 
     IEnumerator IEnumerable.GetEnumerator()

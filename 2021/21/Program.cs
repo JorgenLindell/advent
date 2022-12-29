@@ -29,7 +29,7 @@ namespace _21
         private static IEnumerable<string> LoadStream(TextReader stream)
         {
             var inputLine = stream.ReadLine();
-            while (stream.Peek() != -1 || !inputLine.IsNullOrEmpty())
+            while (stream.Peek() != -1 || !inputLine!.IsNullOrEmpty())
             {
                 if (inputLine is { } && inputLine != "")
                 {

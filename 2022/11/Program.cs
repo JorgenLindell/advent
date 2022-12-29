@@ -87,7 +87,7 @@ Monkey 3:
 
     private static List<Monkey> ParseMonkeys(TextReader stream)
     {
-        Monkey currentMonkey = null;
+        Monkey currentMonkey = null!;
         List<Monkey> monkeyList = new List<Monkey>();
         while (stream.ReadLine() is { } inpLine)
         {
@@ -96,7 +96,7 @@ Monkey 3:
             {
                 if (parts[0] == "Monkey")
                 {
-                    if (currentMonkey != null)
+                    if (currentMonkey != null!)
                         monkeyList.Add(currentMonkey);
                     currentMonkey = new Monkey()
                     {
@@ -144,7 +144,7 @@ internal class Monkey
 {
     private static long _bigDivBy = 1;
     private long _divBy;
-    public string Name { get; set; }
+    public string Name { get; set; } = "";
     public long Value { get; set; } = 0;
     public Queue<long> Items { get; set; }
     public Func<long, long> Operation { get; private set; } = x => x;
