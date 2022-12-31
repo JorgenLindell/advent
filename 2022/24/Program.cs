@@ -22,7 +22,7 @@ internal class Program
     private static void Main(string[] args)
     {
         PositionBase.NorthIsNegative = true;
-        //  FirstPart(GetDataStream);
+        FirstPart(GetDataStream);
         SecondPart(GetDataStream);
     }
 
@@ -36,36 +36,32 @@ internal class Program
 
     private static void SecondPart(Func<TextReader> getDataStream)
     {
-        var startPos = Setup(getDataStream, out var endPos, out var matrix);
+        var (startPos, endPos) = Setup(getDataStream, out var matrix);
 
         matrix.PrintOut(0, startPos, new List<Position>(), 0);
 
+        // walk 3 "legs" back and forth
         var walker = new Walker(startPos, endPos, 3);
-        var best1 = walker.DoMoves(0, 10000, startPos, 1, startPos, endPos, 0);
-        
+        var best1 = walker.DoMoves(0, bestResult: 100000, startPos,leg: 1, startPos, endPos,level: 0);
+
         Console.WriteLine($" 2 Best = {best1}");
-
-
     }
 
     private static void FirstPart(Func<TextReader> getDataStream)
     {
-        var startPos = Setup(getDataStream, out var endPos, out var matrix);
-
-
-        int veryBest = int.MaxValue;
+        var (startPos, endPos) = Setup(getDataStream, out var matrix);
 
         matrix.PrintOut(0, startPos, new List<Position>(), 0);
 
-        var walker = new Walker(startPos, endPos, 3);
-        veryBest = walker.DoMoves(0, veryBest, startPos, 1, startPos, endPos, 0);
+        var walker = new Walker(startPos, endPos, 1);
+        var veryBest = walker.DoMoves(0, bestResult:100000, startPos, leg:1, startPos, endPos,level: 0);
 
-        Console.WriteLine("Best = " + veryBest);
+        Console.WriteLine(" 1 Best = " + veryBest);
 
         // Local 
     }
 
-    private static Position Setup(Func<TextReader> getDataStream, out Position endPos, out Matrix matrix)
+    private static (Position start, Position end) Setup(Func<TextReader> getDataStream, out Matrix matrix)
     {
         var stream = getDataStream();
         var lines = Load(stream);
@@ -74,10 +70,10 @@ internal class Program
         var height = lines.Count - 2;
 
 
-        var start = lines[0].IndexOf("#.##");
-        var end = lines[height + 1].IndexOf("##.#") + 1;
+        var start = lines[0].IndexOf("#.##", StringComparison.Ordinal);
+        var end = lines[height + 1].IndexOf("##.#", StringComparison.Ordinal) + 1;
         var startPos = new Position(start, -1);
-        endPos = new Position(end, height);
+        Position endPos = new Position(end, height);
         matrix = new Matrix(new Position(width - 1, height - 1));
         Blizzard.Matrix = Walker.Matrix = matrix;
 
@@ -102,7 +98,7 @@ internal class Program
                 }
             }
 
-        return startPos;
+        return (startPos, endPos);
     }
 
     private static List<string> Load(TextReader stream)
