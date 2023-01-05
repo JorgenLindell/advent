@@ -150,7 +150,8 @@ internal class Monkey
         Level = level;
         if (Level > Monkeys.Count)
         {
-            throw new InvalidOperationException($"Recurse level > {Monkeys.Count}, there can't be that many monkeys; loop in definitions")
+            throw new InvalidOperationException(
+                $"Recurse level > {Monkeys.Count}, there can't be that many monkeys; loop in definitions");
         }
         if (_result != null)
             return _result; // already have a value, given or calculated
@@ -180,8 +181,8 @@ internal class Monkey
 
     public long NeedToBe(long expectedResult, Stack<string> callOrder)
     {
-        // if this monkey should return the expected result, what should the next last monkey in the call chain say?
-        if (_operands.Count == 1 || callOrder.Count == 0)
+        // if this monkey should return the expected result, what should the last monkey in the call chain say?
+        if (_operands.Count == 1 || callOrder.Count == 0) // at a value, or exhausted ( should happen at the "humn" monkey.)
             return expectedResult;
 
         var nextMonkey = callOrder.Pop();
@@ -200,12 +201,13 @@ internal class Monkey
             "*" => expectedResult / b,
 
             "-" => operIx == 0
-                ? (expectedResult + b) // _result = a - b;)
-                : (b - expectedResult), // _result = b - a),
+                ? (expectedResult + b)  // reverse _result = a - b;)
+                : (b - expectedResult), // reverse _result = b - a),
 
             "/" => operIx == 0
-                ? expectedResult * b // _result = a / b;
-                : b / expectedResult, // _result = b / a
+                ? expectedResult * b    // reverse _result = a / b;
+                : b / expectedResult,   // reverse _result = b / a
+
             _ => throw new InvalidDataException("Unknown operation "+Operation)
         };
 
