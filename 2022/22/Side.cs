@@ -170,9 +170,9 @@ internal class Side
             {
                 Debug.WriteLine($"Side {Name} is missing {going}");
 
-                /* here we might try go via 2 already connected sides on cube, ie:
-                    go sideways via connection, turn 90, go via connection, turn 90, then connect wit accumulated number of rotations
-                or figure out the pattern for that type of connections... 
+                /* connect non connected sides by going via one that is connected.
+                    i.e. turn sideways, go next side, turn other way, go next side, turn same again 
+                    and check if that is a unconnected side', then it is the one.
                  */
 
                 var result = SneakAroundCorner(going, -1);
@@ -186,11 +186,11 @@ internal class Side
                     var turns = invertedResult - going;
                     if (!this.Connections.ContainsKey(going))
                     {
-                        Map.Log($"b Connect {Name} {going} to {result.Side.Name}  t {going.Turn(turns)} ");
+                        Map.Log($"b Connect {Name} {going} to {result.Side.Name}  t {turns} ");
                         this.Connections[going] = new SideConnection(turns, result.Side);
                         if (result.Side.Connections.ContainsKey(result.Direction))
                             throw new Exception("Non consistent data in side connections");
-                        Map.Log($"   Connect {result.Side.Name} {result.Direction} to {Name}  t {going.Turn(-turns)} ");
+                        Map.Log($"   Connect {result.Side.Name} {result.Direction} to {Name}  t {-turns} ");
                         result.Side.Connections[result.Direction] = new SideConnection(-turns, this);
                         countConnected++;
                     }
@@ -212,23 +212,22 @@ internal class Side
             if (Connections.ContainsKey(dir1))
             {
                 var conn1 = Connections[dir1];
-                var nextdir1 = dir1.Turn(conn1.Turn);
-                //  nextdir1 = nextdir1.Invert();
-                Debug.Write($"{conn1.Side.Name} go:{dir1} enter:{nextdir1} ");
-                nextdir1 = nextdir1.Turn(-steps);
-                Debug.Write($" turn:{nextdir1}->");
+                var nextDir1 = dir1.Turn(conn1.Turn);
+                Debug.Write($"{conn1.Side.Name} go:{dir1} enter:{nextDir1} ");
+                nextDir1 = nextDir1.Turn(-steps);
+                Debug.Write($" turn:{nextDir1}->");
 
-                if (conn1.Side.Connections.ContainsKey(nextdir1))
+                if (conn1.Side.Connections.ContainsKey(nextDir1))
                 {
-                    var conn2 = conn1.Side.Connections[nextdir1];
-                    var nextdir2 = nextdir1.Turn(conn2.Turn);
-                    Debug.Write($"{conn2.Side.Name} go:{nextdir1} enter:{nextdir2} ");
-                    nextdir2 = nextdir2.Turn(-steps);
-                    Debug.Write($" turn:{nextdir2}->");
-                    if (!conn2.Side.Connections.ContainsKey(nextdir2))
+                    var conn2 = conn1.Side.Connections[nextDir1];
+                    var nextDir2 = nextDir1.Turn(conn2.Turn);
+                    Debug.Write($"{conn2.Side.Name} go:{nextDir1} enter:{nextDir2} ");
+                    nextDir2 = nextDir2.Turn(-steps);
+                    Debug.Write($" turn:{nextDir2}->");
+                    if (!conn2.Side.Connections.ContainsKey(nextDir2))
                     {
-                        Debug.WriteLine($"Found {conn2.Side.Name} has missing {nextdir2}");
-                        return (Side: conn2.Side, Direction: nextdir2);
+                        Debug.WriteLine($"Found {conn2.Side.Name} has missing {nextDir2}");
+                        return (Side: conn2.Side, Direction: nextDir2);
                     }
                 }
                 Debug.WriteLine($"Nope");
