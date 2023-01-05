@@ -63,6 +63,9 @@ internal class MonkeyMap : SparseMatrix<GlobalPosition, Tile, Position<GlobalPos
         //Local 
         void LoadLine(MonkeyMap map, string inpLine, int currLineIx)
         {
+            // map is represented by a "SparseMatrix" with values for different cell
+            // types Edge, Free and  Wall, outside map is empty
+
             (startOfCont, endOfCont) = FindContent(inpLine);
 
             if (currLineIx == startingLineIndex)
@@ -75,25 +78,16 @@ internal class MonkeyMap : SparseMatrix<GlobalPosition, Tile, Position<GlobalPos
                 (p, _) =>
                 {
                     var pos = new GlobalPosition(p, currLineIx);
-                    var side = map.GlobalToSide(pos);
-                    if (map.Sides.IsEmpty(side.SidePosition))
+                    var inPageData = map.GlobalToSide(pos);
+                    if (map.Sides.IsEmpty(inPageData.SidePosition))
                     {
-                        map.Sides.Value(side.SidePosition, new Side(side.SidePosition, side.SideStart));
+                        map.Sides.Value(inPageData.SidePosition, new Side(inPageData.SidePosition, inPageData.SideStart));
                     }
                     if (inpLine[p] != '.')
                     {
                         map.Value(pos, new Tile(Tile.EWall, pos));
                         return;
                     }
-
-                    //    if ((inpLine[p] == ' ') & (lastChar != ' '))
-                    //    {
-                    //        map.Value(pos, new Tile(Tile.EEdge, pos));
-                    //    }
-                    //    else if ((inpLine[p] != ' ') & (lastChar == ' '))
-                    //    {
-                    //        map.Value(pos.PosWest, new Tile(Tile.EEdge, pos.PosWest));
-                    //    }
 
                     lastChar = inpLine[p];
 
@@ -141,18 +135,20 @@ internal class MonkeyMap : SparseMatrix<GlobalPosition, Tile, Position<GlobalPos
 
         void AddHorizEdges(MonkeyMap map, int startingLineIndex1)
         {
+            // vertical edges have been set for each line, now add horizontal
+
             startOfCont = (int)map.Values.Min(x => x.Pos.X);
             endOfCont = (int)map.Values.Max(x => x.Pos.X);
             var last = (int)map.Values.Min(x => x.Pos.Y);
             for (var x = startOfCont + 1; x < endOfCont; x++)
             {
-                //for each column, search downward for content
+                //for each column, search downward for actual content
                 var startPos1 = new GlobalPosition(x, startingLineIndex1 + 1);
                 while (map.IsEmpty(startPos1.PosSouth)
                        || map.Value(startPos1.PosSouth)!.Typ == Tile.Types.Edge)
                     startPos1 = startPos1.PosSouth;
 
-                //for each column, search upward for content
+                //for each column, search upward for actual content
                 var endPos1 = new GlobalPosition(x, last - 1);
                 while (map.IsEmpty(endPos1.PosNorth)
                        || map.Value(endPos1.PosNorth)!.Typ == Tile.Types.Edge)
@@ -166,25 +162,28 @@ internal class MonkeyMap : SparseMatrix<GlobalPosition, Tile, Position<GlobalPos
 
         void LoadInstructions(TextReader textReader, MonkeyMap monkeyMap)
         {
-            var instructionLine = textReader.ReadLine()+"S";
+
+            var instructionLine = textReader.ReadLine() + "S"; // add an end marker to force last move to be evaluated.
             var str = "";
             foreach (var c in "" + instructionLine)
             {
-                var i = str.ToInt().HasValue? str.ToInt()!.Value:0;
+                var i = str.ToInt().HasValue ? str.ToInt()!.Value : 0;
                 if (c.In('R', 'L'))
                 {
-                    monkeyMap.Instructions.Add(new Instruction(i, 'N'));
-                    monkeyMap.Instructions.Add(new Instruction(0, c));
+                    // create separate instructions for turns and moves as we aren't sure turns can't be sequential without move
+                    if (i > 0)
+                        monkeyMap.Instructions.Add(new Instruction(i, 'N')); // N designates a 'no turn'
+                    monkeyMap.Instructions.Add(new Instruction(0, c)); //just the turn
                     str = "";
                 }
-                else if(c=='S')
+                else if (c == 'S')
                 {
-                    monkeyMap.Instructions.Add(new Instruction(i, 'S'));
+                    monkeyMap.Instructions.Add(new Instruction(i, 'S')); //just the very last move if no trailing turn.
                     str = "";
                 }
                 else
                 {
-                    str += c;
+                    str += c; // accumulate string as long as not L,R or S
                 }
             }
         }
@@ -211,7 +210,8 @@ internal class MonkeyMap : SparseMatrix<GlobalPosition, Tile, Position<GlobalPos
         }
     }
 
-    public (Side? Side, GlobalPosition SideStart, SidePosition SidePosition, LocalPosition LocalPosition, long SideId) GlobalToSide(GlobalPosition pos)
+    public (Side? Side, GlobalPosition SideStart, SidePosition SidePosition, LocalPosition LocalPosition, long SideId) 
+        GlobalToSide(GlobalPosition pos)
     {
         var sideWidth = SideWidth;
         var (sidePosition, sideStart) = CalcSidePos(pos, sideWidth);
@@ -230,6 +230,7 @@ internal class MonkeyMap : SparseMatrix<GlobalPosition, Tile, Position<GlobalPos
     public static (SidePosition sidePosition, GlobalPosition sideStart) CalcSidePos(GlobalPosition pos, int sideWidth)
     {
         var sidePosition = new SidePosition(pos.X / sideWidth, pos.Y / sideWidth);
+        // adjust for x < 0 and y>0. Having a y that goes 0 and downwards was not the best decision..
         if (pos.Y > 0)
         {
             sidePosition.Y++;
@@ -247,6 +248,7 @@ internal class MonkeyMap : SparseMatrix<GlobalPosition, Tile, Position<GlobalPos
 
     public void AddEdge(GlobalPosition pos, GlobalPosition endPos)
     {
+        //Edge connections are used for part 1 the wrap-around map.
         if (!EdgeConnections.ContainsKey(pos))
             EdgeConnections[pos] = default;
         var connect = EdgeConnections[pos];
@@ -258,7 +260,6 @@ internal class MonkeyMap : SparseMatrix<GlobalPosition, Tile, Position<GlobalPos
             throw new InvalidDataException("Inconsistent edge");
         EdgeConnections[pos] = connect;
     }
-
 
     public static (long minY, long maxY, long minX, long maxX) MinMaxMap(MonkeyMap map)
     {
@@ -276,36 +277,6 @@ internal class MonkeyMap : SparseMatrix<GlobalPosition, Tile, Position<GlobalPos
         }
 
         return (minY, maxY, minX, maxX);
-    }
-
-
-    public static void TestRotate()
-    {
-        var x = Position.East;
-        ((long, long) pos, (long, long) expected)[] arrayOfPos =
-        {
-            ((4, 0), (3, 0)),
-            ((4, -1), (2, 0)),
-            ((4, -2), (1, 0)),
-            ((4, -3), (0, 0)),
-            ((3, 0), (3, -1)),
-            ((5, -1), (2, 1)),
-            ((3, -2), (1, -1)),
-            ((5, -3), (0, 1)),
-        };
-
-        var center = (1.5, -1.5);
-        Debug.WriteLine($"Center: {center} ");
-
-        var i = 0;
-        foreach (var pos in arrayOfPos)
-        {
-            var lp = new LocalPosition(pos.pos.Item1, pos.pos.Item2);
-            var lp2 = Side.RotateAround(lp, center, 1, out (double, double) actual);
-            lp2.Y = ((4 - lp2.Y) - 8) % 4;
-            Debug.WriteLine($" {lp}  -> {lp2} actual:{actual}  expected {pos.expected}");
-            i++;
-        }
     }
 
     public void Log(string msg)

@@ -1,6 +1,8 @@
-﻿internal class Instruction
+﻿namespace _22;
+
+internal class Instruction
 {
-    public enum Rotate { Left = -1, Right = +1 }
+    public enum Rotate { Left = -1, Right = +1 }  //rotation circle goes clockwise
     public int Steps { get; }
     public Rotate Turn { get; }
 

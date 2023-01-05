@@ -29,7 +29,7 @@ internal class Program
 
     private static void Main(string[] args)
     {
-        //  FirstPart();
+        FirstPart();
         SecondPart();
     }
 
@@ -43,33 +43,49 @@ internal class Program
     private static void SecondPart()
     {
         Side.ResetSeq();
+        MonkeyMap.UseCubeCoordinates = true; //flag for part 1 or part 2
         var map = MonkeyMap.Load(GetDataStream);
         // calculate sides
+        // Basic assumption:
+        // if two sides of the map are connected in a 90 degrees angle via a third, the they go together.
+        //   ie if you miss a connection south, then turn sideways, go next page, turn the other way, go nex an repeat that turn
+        //   if you now is on a sid missing connection north, than that is it, connect them.
+        // repeat that process to use the just connected ones
         map.Sides.Values.ForEach((s, _) => s.MakeDirectConnections());
-        map.Sides.Values.Reverse().ForEach((s, _) => s.CheckMissing());
-        map.Sides.Values.ForEach((s, _) => s.CheckMissing());
+
+        while (map.Sides.Values.Sum(s => s.CheckMissing()) > 0)
+        { }
+
         Debug.WriteLine("");
 
+        // diagnostic: All connected sides
         map.Sides.Values.ForEach((s, _) => s.PrintSides());
 
-        MonkeyMap.UseCubeCoordinates = true;
         PrintOut(map, small: false);
 
-        Walker me = new Walker(map.StartPos!, Direction.E, map);
+        // walk the walk
+        Walker walker = new Walker(map.StartPos!, Direction.E, map);
         foreach (var instr in map.Instructions)
         {
-            me.Execute(instr);
+            walker.Execute(instr);
         }
 
-        Debug.WriteLine($"Walker at = {me.Pos}");
-        PrintOut(map, true,false,  me);
-        var row = (me.Pos.Y * -1)+1 ;
-        var col = me.Pos.X + 1;
-        var faces = new[] { 3, 0, 1, 2, };
-        var face = faces[(int)me.Direction];
 
-        Debug.WriteLine($"Final answer 2 {row} {col} {face}: {(1000 * row + 4 * col + face)}");
+        PrintOut(map, true, false, walker);
 
+        //calc result
+        PrintResult(walker, 2);
+    }
+
+    private static void PrintResult(Walker walker, int task)
+    {
+        var walkerPos = walker.Pos;
+        Debug.WriteLine($"Walker at = {walkerPos}");
+        var row = (walkerPos.Y * -1) + 1;
+        var col = walkerPos.X + 1;
+        var faces = new[] { 3, 0, 1, 2, }; // translate facing
+        var face = faces[(int)walker.Direction];
+        Debug.WriteLine($"Final answer {task} {row} {col} {face}: {(1000 * row + 4 * col + face)}");
     }
 
 
@@ -87,16 +103,7 @@ internal class Program
         }
 
 
-        Debug.WriteLine($"Walker at = {me.Pos}");
-        //   me.Track.ForEach(
-        //       x => Debug.WriteLine(x));
-        var row = (me.Pos.Y * -1) ;
-        var col = me.Pos.X + 1;
-        var faces = new[] { 3, 0, 1, 2, };
-        var face = faces[(int)me.Direction];
-
-
-        Debug.WriteLine($"Final answer 1 {row} {col} {face}: {(1000 * row + 4 * col + face)}");
+        PrintResult(me, 1);
     }
 
     private static void PrintOut(MonkeyMap map, Boolean force = false, bool small = false, Walker? walker = null)
@@ -140,7 +147,7 @@ internal class Program
                     }
                     else
                     {
-                        if (tile.Typ == Tile.Types.Edge)
+                        if (tile.Typ == Tile.Types.Edge && MonkeyMap.UseCubeCoordinates)
                         {
                             var increment = new GlobalPosition(incr, 0);
                             var prevSide = map.GlobalToSide(position - increment);

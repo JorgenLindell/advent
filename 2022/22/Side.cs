@@ -158,8 +158,9 @@ internal class Side
         return;
     }
 
-    public void CheckMissing()
+    public int CheckMissing()
     {
+        var countConnected = 0;
         foreach (var direction in DirectionExtensions.Values())
         {
             var increment = GlobalPosition.Directions[(int)direction];
@@ -191,6 +192,7 @@ internal class Side
                             throw new Exception("Non consistent data in side connections");
                         Map.Log($"   Connect {result.Side.Name} {result.Direction} to {Name}  t {going.Turn(-turns)} ");
                         result.Side.Connections[result.Direction] = new SideConnection(-turns, this);
+                        countConnected++;
                     }
 
                 }
@@ -200,6 +202,7 @@ internal class Side
                 }
             }
         }
+        return countConnected;
 
         (Side Side, Direction Direction) SneakAroundCorner(Direction missingDirection, int steps)
         {
@@ -228,25 +231,11 @@ internal class Side
                         return (Side: conn2.Side, Direction: nextdir2);
                     }
                 }
-
-                //      nextdir1 = dir1.Turn(conn1.Turn).Turn(-1);
-                //
-                //     if (conn1.Side.Connections.ContainsKey(nextdir1))
-                //     {
-                //         var conn2 = conn1.Side.Connections[nextdir1];
-                //         var nextdir2 = dir1.Turn(conn2.Turn).Turn(-1);
-                //         if (!conn1.Side.Connections.ContainsKey(nextdir2))
-                //             return (Side: conn2.Side, Direction: nextdir2);
-                //     }
-
-
-
                 Debug.WriteLine($"Nope");
                 return default;
             }
             Debug.WriteLine($"Nope");
             return default;
-
         }
     }
 
@@ -277,45 +266,30 @@ internal class Side
         p.Y = (long)Math.Round(yNew);
         return p;
     }
-    /*
- *      0 1 2 3 |4                      
- *   0  - - - A |a                   
- *  -1  - - - - |b B                 
- *  -2  - - - C |c                   
- *  -3  - - - - |d D
- *
- *                   C   A          
- *                 0 1 2 3 
- *               0 d c b a
- *              -1 D - B -
- *              -2 - - - -
- *              -3 - - - -
- *
- *
- *  a (4,0)  > (3,0)
- *  b (4,-1) > (2.0)
- *  c (4,-2) > (1,0)
- *  d (4,-3) > (0,0)
- *  A (3,0)  > (3,-1)
- *  B (5,-1) > (2,1),
- *  C (3,-2) > (1,-1)
- *  D (5,-3) > (0,1)
- *
- *
- */
 
-    public (LocalPosition Local, GlobalPosition Incr, SideConnection Connect) Translate(LocalPosition startSideLocalPosition, LocalPosition localIncrement)
+
+    public (LocalPosition Local, GlobalPosition Incr, SideConnection Connect)
+        Translate(LocalPosition startSideLocalPosition, LocalPosition localIncrement)
     {
         var direction = localIncrement.ToDirection();
         if (direction == null)
             throw new Exception("Increment is not a clean direction");
+
+        // get connection in requested direction
         SideConnection connect = this.Connections[direction.Value];
         var sideLocalPosition = startSideLocalPosition;
-        double mapSideWidth = (Map.SideWidth & 1) == 1 ? (Map.SideWidth + 1) / 2d : (Map.SideWidth - 1) / 2d;
-        (double x, double y) midLocal = (mapSideWidth, -mapSideWidth);
+        double middleOfSide = (Map.SideWidth & 1) == 1
+            ? (Map.SideWidth + 1) / 2d  // 0..4 == length 5, midpoint=3
+            : (Map.SideWidth - 1) / 2d; // 0..49 == length 50, midpoint=24.5
+
+        (double x, double y) midLocal = (middleOfSide, -middleOfSide);
+
         var lp2 = RotateAround(sideLocalPosition!, midLocal, connect.Turn, out (double, double) actual);
+        // increments are -1..+1, ie midpoint = 0
         var newIncrement = RotateAround(localIncrement, (0, 0), connect.Turn, out actual);
         var sw = Map.SideWidth;
+        // transpose the relevant coordinate, the rotation was done at the place of the starting side,
+        // it should end up from the perspective of the ending side
         var lpOut = lp2 + newIncrement.ToDirection() switch
         {
             Direction.W => (sw, 0),
@@ -324,10 +298,10 @@ internal class Side
             Direction.S => (0, sw),
             _ => throw new ArgumentOutOfRangeException()
         };
-        Debug.WriteLine($"Translating {Name}{sideLocalPosition+localIncrement} going {direction} => {connect.Side.Name}{lpOut+newIncrement}  going {newIncrement.ToDirection()}  (turn:{connect.Turn})  raw:({lp2})");
+        Debug.WriteLine($"Translating {Name}{sideLocalPosition + localIncrement} going {direction} "
+            + $"=> {connect.Side.Name}{lpOut + newIncrement}  going {newIncrement.ToDirection()}  (turn:{connect.Turn})  raw:({lp2})");
         return (Local: lpOut, Incr: new GlobalPosition(newIncrement), Connect: connect);
     }
-
 
     public static void ResetSeq()
     {
@@ -335,11 +309,12 @@ internal class Side
     }
 
     public void PrintSides()
-    {
+    { 
+        // diagnostic printout to show connected sides
         var N = Connections[Direction.N].Side.Name;
         var E = Connections[Direction.E].Side.Name;
         var S = Connections[Direction.S].Side.Name;
-        var W= Connections[Direction.W].Side.Name;
+        var W = Connections[Direction.W].Side.Name;
 
         Debug.WriteLine($"---");
         Debug.WriteLine($" {N} ");

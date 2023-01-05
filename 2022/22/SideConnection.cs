@@ -5,7 +5,7 @@ namespace _22;
 
 internal class SideConnection
 {
-    public int Turn { get; }
+    public int Turn { get; } // number of clockwise turns needed to align the two local coordinate systems
     public Side Side { get; }
 
     public override string ToString()
