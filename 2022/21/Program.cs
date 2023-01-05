@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Reflection;
 using common;
 
 
@@ -46,7 +47,7 @@ hmdt: 32"
     {
         var monkeys = LoadMonkeys(stream);
         var root = monkeys["root"];
-        var result = root.Result(); // try to evaluate to save call order
+        var result = root.Evaluate(); // try to evaluate to save call order
         Debug.WriteLine("root says:" + result);
 
 
@@ -56,13 +57,13 @@ hmdt: 32"
 
         // get call order upwards that was registered during calculation
         var stack = new Stack<string>();
-        while (bottom!=null && bottom.Name != "root")
+        while (bottom != null && bottom.Name != "root")
         {
             stack.Push(bottom.Name);
             bottom = bottom.CalledBy; // was noted during first evaluation
         }
-
-        var target = root.NeedToBe(1, stack);
+        // NeedToBe calculates "backwards" what the operand needs to be on each level to get the expected result
+        var target = root.NeedToBe(expectedResult: 1, stack);
 
         Debug.WriteLine("target=" + target);
 
@@ -72,9 +73,9 @@ hmdt: 32"
         root = monkeys["root"];
         root.Operation = "=";
         monkeys["humn"].SetConstant(target);
-        result = root.Result();
-        Debug.WriteLine($"root says:{result}  meaning the solution {(result == 1 ? "succeeded":"failed")}");
-        
+        result = root.Evaluate();
+        Debug.WriteLine($"root says:{result}  meaning the solution {(result == 1 ? "succeeded" : "failed")}");
+
     }
 
     private static Dictionary<string, Monkey> LoadMonkeys(TextReader stream)
@@ -92,7 +93,7 @@ hmdt: 32"
 
 internal class Monkey
 {
-    public static Dictionary<string, Monkey> Monkeys=null!;
+    public static Dictionary<string, Monkey> Monkeys = null!;
     private readonly List<(long? Value, string? MonkeyName)> _operands = new();
     private long? _result;
     public string Name { get; }
@@ -102,15 +103,15 @@ internal class Monkey
 
     public Monkey(string formula)
     {
-    //root: pppw + sjmn
-    //dbpl: 5
+        //root: pppw + sjmn
+        //dbpl: 5
 
         var parts = formula.Split(": ".ToCharArray(),
             StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
         Name = parts[0];
-        ParseValue(parts[1]);
+        AddOperand(parts[1]);
         if (parts.Length < 3)
-        { 
+        {
             //value only given
             _result = _operands[0].Value;
         }
@@ -118,11 +119,11 @@ internal class Monkey
         {
             // formula given
             Operation = parts[2];
-            ParseValue(parts[3]);
+            AddOperand(parts[3]);
         }
 
         // local
-        void ParseValue( string part)
+        void AddOperand(string part)
         {
             //Add value or monkey name to operands
             if (part.ToLong().HasValue)
@@ -136,23 +137,28 @@ internal class Monkey
         $"{_operands[0].MonkeyName}{(_operands.Count > 1 ? Operation + _operands[1].MonkeyName : _result)}";
 
 
+
     public void SetConstant(long value)
     {
         _result = value;
     }
 
-    public long? Result(Monkey? calledBy=null, int level=0)
-    {
-        CalledBy = calledBy; //who is asking
+    public long? Evaluate(Monkey? calledBy = null, int level = 0)
+    { 
+        //ask monkey to calculate its value
+        CalledBy = calledBy; //who is asking, remember this to be able to track human value dependents later for part 2
         Level = level;
-
+        if (Level > Monkeys.Count)
+        {
+            throw new InvalidOperationException($"Recurse level > {Monkeys.Count}, there can't be that many monkeys; loop in definitions")
+        }
         if (_result != null)
-            return _result;
+            return _result; // already have a value, given or calculated
 
         if (_operands.Count == 2)
         {
-            var a = OperandValue(0);
-            var b = OperandValue(1);
+            var a = OperandValue(0); // ask for operand 0
+            var b = OperandValue(1); // ask for operand 1
             _result = Operation switch
             {
                 "=" => a == b ? 1 : 0,
@@ -172,60 +178,50 @@ internal class Monkey
     }
 
 
-    public long NeedToBe(long targetValue, Stack<string> callOrder)
+    public long NeedToBe(long expectedResult, Stack<string> callOrder)
     {
+        // if this monkey should return the expected result, what should the next last monkey in the call chain say?
         if (_operands.Count == 1 || callOrder.Count == 0)
-            return targetValue;
+            return expectedResult;
 
         var nextMonkey = callOrder.Pop();
         var operIx = _operands.First().MonkeyName == nextMonkey ? 0 : 1;
+        var operOther = operIx == 1 ? 0 : 1;
         long? nextNeeded = 0;
-        if (operIx == 0)
-        {
-            var b = OperandValue(1);
-            nextNeeded = Operation switch
-            {
-                "=" => b,
-                "+" => targetValue - b,
-                "-" =>
-                    // _result = a - b;
-                    targetValue + b,
-                "*" => targetValue / b,
-                "/" =>
-                    // _result = a / b;
-                    targetValue * b,
-                _ => nextNeeded
-            };
-
-            return Monkeys[_operands[operIx].MonkeyName!].NeedToBe(nextNeeded!.Value, callOrder);
-        }
-
-        var a = OperandValue(0);
+        // order of operands matters in - and / so they need to be handled depending on operand order
+ 
+        var b = OperandValue(operOther);
         nextNeeded = Operation switch
         {
-            "=" => a,
-            "+" => targetValue - a,
-            "-" =>
-                // _result = a - b;
-                a - targetValue,
-            "*" => targetValue / a,
-            "/" =>
-                // _result = a / b;
-                a / targetValue,
-            _ => nextNeeded
+            "=" => b,
+
+            "+" => expectedResult - b,
+
+            "*" => expectedResult / b,
+
+            "-" => operIx == 0
+                ? (expectedResult + b) // _result = a - b;)
+                : (b - expectedResult), // _result = b - a),
+
+            "/" => operIx == 0
+                ? expectedResult * b // _result = a / b;
+                : b / expectedResult, // _result = b / a
+            _ => throw new InvalidDataException("Unknown operation "+Operation)
         };
 
+        // tell next monkey if it should return nextNeeded, what should the bottom money (=human) say?
         return Monkeys[_operands[operIx].MonkeyName!].NeedToBe(nextNeeded!.Value, callOrder);
     }
 
 
     private long? OperandValue(int index)
     {
+        // operands[] is either (long? Value, string? MonkeyName) i.e. a set value or a monkey name.
         if (index < _operands.Count)
             return _operands[index].Value != null
-                ? _operands[index].Value // has already a value
-                : Monkeys[_operands[index].MonkeyName!].Result(this, Level + 1); // calculate value
-        return null;
+                ? _operands[index].Value    // has already a value set from start
+                : Monkeys[_operands[index].MonkeyName!].Evaluate(this, Level + 1); // ask monkey to calculate value
+        return null; // this is a failure
     }
 
     public override string ToString()
