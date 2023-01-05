@@ -2,6 +2,7 @@
 using System.Reflection.Emit;
 using _24;
 using common;
+using common.SparseMatrix;
 
 
 //https://adventofcode.com/2022/day/23
@@ -85,10 +86,10 @@ internal class Program
                 var c = lines[y][x];
                 var blizzard = c switch
                 {
-                    '^' => new Blizzard(x - 1, y - 1, Offset.N, c),
-                    '>' => new Blizzard(x - 1, y - 1, Offset.E, c),
-                    'v' => new Blizzard(x - 1, y - 1, Offset.S, c),
-                    '<' => new Blizzard(x - 1, y - 1, Offset.W, c),
+                    '^' => new Blizzard(x - 1, y - 1, Direction.N, c),
+                    '>' => new Blizzard(x - 1, y - 1, Direction.E, c),
+                    'v' => new Blizzard(x - 1, y - 1, Direction.S, c),
+                    '<' => new Blizzard(x - 1, y - 1, Direction.W, c),
                     _ => null
                 };
                 if (blizzard != null)

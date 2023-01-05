@@ -1,6 +1,10 @@
 ﻿using System.Diagnostics;
+using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 using common;
 using common.SparseMatrix;
+
+namespace _22;
 
 internal class MonkeyMap : SparseMatrix<GlobalPosition, Tile, Position<GlobalPosition>>
 {
@@ -8,69 +12,17 @@ internal class MonkeyMap : SparseMatrix<GlobalPosition, Tile, Position<GlobalPos
     public int Width { get; set; }
     public int Height { get; set; }
     public int SideWidth { get; set; } = 50;
+    public bool Trace = true;
 
-
-    public Dictionary<string, (int Face, int ColumnMove, int Rotate)> SidePositions = new();
-
-    public Dictionary<int, Dictionary<Offset, int>> StdCube = new()
-    {
-        { 4, new Dictionary<Offset, int> {
-                { Offset.N, 5 },
-                { Offset.E, 1 },
-                { Offset.S, 2 },
-                { Offset.W, 6 }
-            } },
-        { 3, new Dictionary<Offset, int>
-            {
-                { Offset.N, 5 },
-                { Offset.E, 6 },
-                { Offset.S, 2 },
-                { Offset.W, 1 }
-            } },
-
-        { 1, new Dictionary<Offset, int> {
-                { Offset.N, 5 },
-                { Offset.E, 3 },
-                { Offset.S, 2 },
-                { Offset.W, 4 }
-            } },
-        {2, new Dictionary<Offset, int> {
-                { Offset.N, 1 },
-                { Offset.E, 3 },
-                { Offset.S, 6 },
-                { Offset.W, 4 }
-            } },
-        {6, new Dictionary<Offset, int>
-            {
-                { Offset.N, 2 },
-                { Offset.E, 3 },
-                { Offset.S, 5 },
-                { Offset.W, 4 }
-            } },
-        { 5, new Dictionary<Offset, int>
-            {
-                { Offset.N, 6 },
-                { Offset.E, 3 },
-                { Offset.S, 1 },
-                { Offset.W, 4 }
-            } }
-    };
-
-    private int[][] StdSidePositions =
-    {
-        new[] { 4, 1, 3 },
-        new[] { 0, 2, 0 },
-        new[] { 0, 6, 0 },
-        new[] { 0, 5, 0 }
-    };
-
+    public SparseMatrix<SidePosition, Side, Position<SidePosition>> Sides { get; } = new();
     public List<Instruction> Instructions { get; } = new();
     public Dictionary<GlobalPosition, (GlobalPosition Horizontal, GlobalPosition Vertical)> EdgeConnections { get; } = new();
+    public static bool UseCubeCoordinates { get; set; }
 
     public static MonkeyMap Load(Func<TextReader> getDataStream)
     {
         var stream = getDataStream();
-        var map = Tile.Map = new MonkeyMap();
+        var map = Tile.Map = Side.Map = new MonkeyMap();
         var startingLineIndex = 0;
 
         AnalyseStreamForSizes(stream, map);
@@ -82,25 +34,24 @@ internal class MonkeyMap : SparseMatrix<GlobalPosition, Tile, Position<GlobalPos
 
         var lineIx = startingLineIndex;
         lineIx++;
+        var countOfLines = 0;
         while (stream.ReadLine() is { } inpLine)
         {
             if (inpLine == "") break;
+            countOfLines++;
 
             lineIx--;
 
             // load content line
             LoadLine(map, inpLine, lineIx);
         }
+        Debug.WriteLine($"Read lines={countOfLines}");
 
         // add horizontal edges
         AddHorizEdges(map, startingLineIndex);
 
 
-        // calculate sides
-        map.CalculateSides();
 
-
-        Debug.WriteLine($"Read lines={-lineIx - 1}");
         // PrintOut(map);
 
         //Read walking instructions
@@ -119,32 +70,33 @@ internal class MonkeyMap : SparseMatrix<GlobalPosition, Tile, Position<GlobalPos
                 map.StartPos = new GlobalPosition(startOfCont, currLineIx);
 
             var lastChar = ' ';
+
             Enumerable.Range(startOfCont, endOfCont - startOfCont + 1).ForEach(
                 (p, _) =>
                 {
-                    GlobalPosition pos;
+                    var pos = new GlobalPosition(p, currLineIx);
+                    var side = map.GlobalToSide(pos);
+                    if (map.Sides.IsEmpty(side.SidePosition))
+                    {
+                        map.Sides.Value(side.SidePosition, new Side(side.SidePosition, side.SideStart));
+                    }
                     if (inpLine[p] != '.')
                     {
-                        pos = new GlobalPosition(p, currLineIx);
                         map.Value(pos, new Tile(Tile.EWall, pos));
                         return;
                     }
 
-                    if ((inpLine[p] == ' ') & (lastChar != ' '))
-                    {
-                        pos = new GlobalPosition(p, currLineIx);
-                        map.Value(pos, new Tile(Tile.EEdge, pos));
-                    }
-
-                    if ((inpLine[p] != ' ') & (lastChar == ' '))
-                    {
-                        pos = new GlobalPosition(p, currLineIx);
-                        map.Value(pos.PosWest, new Tile(Tile.EEdge, pos.PosWest));
-                    }
+                    //    if ((inpLine[p] == ' ') & (lastChar != ' '))
+                    //    {
+                    //        map.Value(pos, new Tile(Tile.EEdge, pos));
+                    //    }
+                    //    else if ((inpLine[p] != ' ') & (lastChar == ' '))
+                    //    {
+                    //        map.Value(pos.PosWest, new Tile(Tile.EEdge, pos.PosWest));
+                    //    }
 
                     lastChar = inpLine[p];
 
-                    pos = new GlobalPosition(p, currLineIx);
                     map.Value(pos, new Tile(Tile.EFree, pos));
                 });
             // set edge markers at start and end
@@ -159,6 +111,7 @@ internal class MonkeyMap : SparseMatrix<GlobalPosition, Tile, Position<GlobalPos
             map.Value(startPos, new Tile(Tile.EEdge, startPos, endPos));
             map.Value(endPos, new Tile(Tile.EEdge, endPos, startPos));
 
+            return;
 
             // local
             (int startOfCont, int endOfCont) FindContent(string s)
@@ -213,18 +166,27 @@ internal class MonkeyMap : SparseMatrix<GlobalPosition, Tile, Position<GlobalPos
 
         void LoadInstructions(TextReader textReader, MonkeyMap monkeyMap)
         {
-            var instructionLine = textReader.ReadLine();
+            var instructionLine = textReader.ReadLine()+"S";
             var str = "";
             foreach (var c in "" + instructionLine)
+            {
+                var i = str.ToInt().HasValue? str.ToInt()!.Value:0;
                 if (c.In('R', 'L'))
                 {
-                    monkeyMap.Instructions.Add(new Instruction(str.ToInt()!.Value, c));
+                    monkeyMap.Instructions.Add(new Instruction(i, 'N'));
+                    monkeyMap.Instructions.Add(new Instruction(0, c));
+                    str = "";
+                }
+                else if(c=='S')
+                {
+                    monkeyMap.Instructions.Add(new Instruction(i, 'S'));
                     str = "";
                 }
                 else
                 {
                     str += c;
                 }
+            }
         }
 
         void AnalyseStreamForSizes(TextReader stream1, MonkeyMap map1)
@@ -241,116 +203,47 @@ internal class MonkeyMap : SparseMatrix<GlobalPosition, Tile, Position<GlobalPos
             }
 
             var verify = count % sideWidth == mapWidth % sideWidth;
+            if (verify == false || count % sideWidth != 0 || mapWidth % sideWidth != 0)
+                throw new Exception("Can't figure out sidewidth");
             map1.SideWidth = sideWidth;
             map1.Width = mapWidth;
             map1.Height = count;
         }
     }
 
-    private void CalculateSides()
+    public (Side? Side, GlobalPosition SideStart, SidePosition SidePosition, LocalPosition LocalPosition, long SideId) GlobalToSide(GlobalPosition pos)
     {
-        var tempPos = StartPos;
-        var side = Side(tempPos);
-        var loadedSidePos = side.SidePos;
-        SidePosition stdSidePos = FacePosition(1);
-        int columnMove = 0;
-        int rotate = 0;
-        if (loadedSidePos != stdSidePos)
-        {
-            var diff = (stdSidePos - loadedSidePos) ;
-            columnMove = (int)diff.Y;
-            rotate = (int) diff.X;
-        }
-        SidePositions[side.Name] = (Face: 1, ColumnMove: columnMove, Rotate: rotate);
-
-    }
-
-    private SidePosition FacePosition(int face)
-    {
-        for (var r = 0; r < 4; r++)
-        {
-            for (var c = 0; c < 5; c++)
-            {
-                if (StdSidePositions[r][c] == face)
-                {
-                    return new SidePosition(c,r);
-                }
-            }
-        }
-
-        throw new KeyNotFoundException("No face called " + face);
-    }
-
-    public (string Name, SidePosition SidePos, GlobalPosition StartSide, LocalPosition Pos) Side(GlobalPosition pos)
-    {
-        var mapSidesWidth = Width / SideWidth;
-        var sidey = (-pos.Y - 1) / SideWidth;
-        var sidex = pos.X / SideWidth;
-        var name = "" + (char)('a' + sidey * mapSidesWidth + sidex);
-        var sidePos = new SidePosition(sidex, sidey);
-        var (startSide, localPos) = PosInSide(pos);
-        return (Name: name, SidePos: sidePos, StartSide: startSide, Pos: localPos);
-    }
-
-    public GlobalPosition GlobalPos(string side, LocalPosition pos)
-    {
-        var mapSidesWidth = Width / SideWidth;
-        var nameNum = side[0] - 'a';
-        var sideY = nameNum / mapSidesWidth;
-        var sideX = nameNum * mapSidesWidth;
-        var posY = -(sideY * SideWidth + 1);
-        var posX = -(sideY * SideWidth + 1);
-        return new GlobalPosition(posX, posY);
-    }
-
-
-    public (GlobalPosition StartSide, LocalPosition Pos) PosInSide(GlobalPosition pos)
-    {
-        var adjY = pos.Y;
         var sideWidth = SideWidth;
-        var startY = adjY / sideWidth * sideWidth - 1;
-        var startX = pos.X / sideWidth * sideWidth;
+        var (sidePosition, sideStart) = CalcSidePos(pos, sideWidth);
+        var side = Sides.Value(sidePosition);
+        var number = sidePosition.Y * sideWidth + sidePosition.X;
 
-        var posInSide = (StartSide: new GlobalPosition(startX, startY),
-            Pos: new LocalPosition(pos.X % sideWidth, adjY % sideWidth + 1));
+        var posInSide = (
+            Side: side,
+            SideStart: sideStart,
+            SidePosition: sidePosition,
+            LocalPosition: new LocalPosition(pos - sideStart),
+            SideId: number);
         return posInSide;
     }
 
-
-    public LocalPosition FlipCoordinates(Offset fromDir, Offset toDir, LocalPosition pos)
+    public static (SidePosition sidePosition, GlobalPosition sideStart) CalcSidePos(GlobalPosition pos, int sideWidth)
     {
-        return FlipCoordinates(fromDir, toDir, pos, out _);
-    }
-
-    public LocalPosition FlipCoordinates(Offset fromDir, Offset toDir, LocalPosition pos, out int rot)
-    {
-        rot = toDir - fromDir;
-        var newPos2 = RotSidePos(pos, rot);
-
-        return newPos2;
-    }
-
-    public LocalPosition RotSidePos(LocalPosition pos, int r)
-    {
-        LocalPosition Recurse(LocalPosition position, int i1)
+        var sidePosition = new SidePosition(pos.X / sideWidth, pos.Y / sideWidth);
+        if (pos.Y > 0)
         {
-            var resPos1 = position;
-            for (var i = 0; i < Math.Abs(i1); i++) resPos1 = RotSidePos(resPos1, Math.Sign(i1));
-            return resPos1;
+            sidePosition.Y++;
         }
-
-        var sw = SideWidth;
-        var (x, y) = pos;
-        var resPos = r switch
+        if (pos.X < 0)
         {
-            0 => new LocalPosition(pos),
-            -1 => new LocalPosition(y, -sw - x - 1),
-            1 => new LocalPosition(-sw - y - 1, x),
-            _ => Recurse(pos, r)
-        };
-
-        return resPos;
+            sidePosition.X--;
+        }
+        var sideStart = new GlobalPosition(sidePosition * sideWidth);
+        return (sidePosition, sideStart);
     }
+
+    public GlobalPosition SideToGlobal(Side side, LocalPosition localPosition)
+        => new(side.StartSide + new GlobalPosition(localPosition));
 
     public void AddEdge(GlobalPosition pos, GlobalPosition endPos)
     {
@@ -383,5 +276,41 @@ internal class MonkeyMap : SparseMatrix<GlobalPosition, Tile, Position<GlobalPos
         }
 
         return (minY, maxY, minX, maxX);
+    }
+
+
+    public static void TestRotate()
+    {
+        var x = Position.East;
+        ((long, long) pos, (long, long) expected)[] arrayOfPos =
+        {
+            ((4, 0), (3, 0)),
+            ((4, -1), (2, 0)),
+            ((4, -2), (1, 0)),
+            ((4, -3), (0, 0)),
+            ((3, 0), (3, -1)),
+            ((5, -1), (2, 1)),
+            ((3, -2), (1, -1)),
+            ((5, -3), (0, 1)),
+        };
+
+        var center = (1.5, -1.5);
+        Debug.WriteLine($"Center: {center} ");
+
+        var i = 0;
+        foreach (var pos in arrayOfPos)
+        {
+            var lp = new LocalPosition(pos.pos.Item1, pos.pos.Item2);
+            var lp2 = Side.RotateAround(lp, center, 1, out (double, double) actual);
+            lp2.Y = ((4 - lp2.Y) - 8) % 4;
+            Debug.WriteLine($" {lp}  -> {lp2} actual:{actual}  expected {pos.expected}");
+            i++;
+        }
+    }
+
+    public void Log(string msg)
+    {
+        if (Trace)
+            Debug.WriteLine(msg);
     }
 }

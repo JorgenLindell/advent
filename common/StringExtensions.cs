@@ -2,12 +2,24 @@
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace common
 {
     public static class StringExtensions
     {
+        public static string Repeat(this string input, int count)
+        {
+            if (string.IsNullOrEmpty(input) || count <= 1)
+                return input;
+
+            var builder = new StringBuilder(input.Length * count);
+
+            for (var i = 0; i < count; i++) builder.Append(input);
+
+            return builder.ToString();
+        }
         public static string Map(this string s, string s1, string s2)
         {
             var retVal = "";
@@ -99,6 +111,7 @@ namespace common
             }
             throw new ArgumentException("binary string too long for int64");
         }
+
 
     }
 

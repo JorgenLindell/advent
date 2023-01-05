@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using common;
+using common.SparseMatrix;
 
 
 //https://adventofcode.com/2022/day/23
@@ -39,7 +40,7 @@ internal class Program
     {
         var elves = Load(stream).ToDictionary(x => x.Name, x => x);
         Elf.Elves = elves;
-        var rulesIndex = (int)Offset.N;
+        var rulesIndex = (int)Direction.N;
         var round = 0;
         while (true)
         {
@@ -202,37 +203,37 @@ internal class Elf
 
     public (Position Pos, Elf Elf) WantToGo(int rulesIndex)
     {
-        if (Position.AllOffsets.All(o=> IsOccupied(Pos + o)==false))
+        if (Position.AllDirections.All(o=> IsOccupied(Pos + o)==false))
         {
        //     Debug.WriteLine($"No action at {Pos}");
             return (Pos, this);
         }
 
-        var rule = (Offset)((rulesIndex) % 4);
+        var rule = (Direction)((rulesIndex) % 4);
 //        Debug.WriteLine($"Prefering {rule} at {Pos}");
         var pos = Pos;
         for (var i = 0; i < 4; i++)
         {
-            rule = (Offset)((i + rulesIndex) % 4);
+            rule = (Direction)((i + rulesIndex) % 4);
 //            Debug.WriteLine($"  {Name} testing {rule}");
             switch (rule)
             {
-                case Offset.N:
+                case Direction.N:
                     if (IsOccupied(Pos.PosNorthEast) || IsOccupied(Pos.PosNorth) || IsOccupied(Pos.PosNorthWest))
                         continue;
                     pos = Pos.PosNorth;
                     break;
-                case Offset.S:
+                case Direction.S:
                     if (IsOccupied(Pos.PosSouthEast) || IsOccupied(Pos.PosSouth) || IsOccupied(Pos.PosSouthWest))
                         continue;
                     pos = Pos.PosSouth;
                     break;
-                case Offset.W:
+                case Direction.W:
                     if (IsOccupied(Pos.PosNorthWest) || IsOccupied(Pos.PosWest) || IsOccupied(Pos.PosSouthWest))
                         continue;
                     pos = Pos.PosWest;
                     break;
-                case Offset.E:
+                case Direction.E:
                     if (IsOccupied(Pos.PosNorthEast) || IsOccupied(Pos.PosEast) || IsOccupied(Pos.PosSouthEast))
                         continue;
                     pos = Pos.PosEast;

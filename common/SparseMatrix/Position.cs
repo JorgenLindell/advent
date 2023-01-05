@@ -1,15 +1,40 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
+using System.Data;
 using System.IO;
 using System.Linq;
+using System.Net.Http.Headers;
+using System.Numerics;
 
-public enum Offset
+namespace common.SparseMatrix;
+
+public enum Direction
 {
     N = 0,
     E,
     S,
     W
+}
+
+public static class DirectionExtensions
+{
+    public static IEnumerable<Direction> Values()
+    {
+        yield return Direction.N;
+        yield return Direction.E;
+        yield return Direction.S;
+        yield return Direction.W;
+    }
+    public static Direction Turn(this Direction start, int steps)
+    {
+        var length = (int)Direction.W + 1;
+        var result = ((int)start + steps) % length;
+        if (result < 0) result += length;
+        return (Direction)result;
+    }
+
+    public static Direction Invert(this Direction start) => start.Turn(2);
+
 }
 
 
@@ -28,10 +53,11 @@ public interface IPosition
 
 public class PositionBase : IPosition, IEquatable<IPosition>, IEquatable<PositionBase>
 {
-    private int _previousHash = 0;
     public long X { get; set; }
     public long Y { get; set; }
     public static bool NorthIsNegative { get; set; } = false;
+  
+    private int _previousHash = 0; // used to verify that X Y has not changed in getHashCode as that would fail dictionary lookups.
 
 
     public PositionBase(long x, long y)
@@ -63,25 +89,34 @@ public class PositionBase : IPosition, IEquatable<IPosition>, IEquatable<Positio
         y = this.Y;
     }
 
-
-    public static implicit operator (long, long)(PositionBase p)
+    public Direction? ToDirection()
     {
-        return (p.X, p.Y);
+        int directionV = Y switch
+        {
+            > 0 => (int)(NorthIsNegative ? Direction.S : Direction.N),
+            < 0 => (int)(NorthIsNegative ? Direction.N : Direction.S),
+            _ => -1
+        };
+
+        var directionH = X switch
+        {
+            > 0 => (int)Direction.E,
+            < 0 => (int)Direction.W,
+            _ => -1
+        };
+
+        if (directionV > -1 && directionH > -1)
+            return null;
+
+        if (directionV > -1)
+            return (Direction)directionV;
+
+        if (directionH > -1)
+            return (Direction)directionH;
+
+        return null;
     }
 
-
-    public static bool operator ==(PositionBase? left, PositionBase? right)
-    {
-
-        if (ReferenceEquals(left, right))
-            return true;
-        return left?.Equals(right) ?? false;
-    }
-
-    public static bool operator !=(PositionBase left, PositionBase right)
-    {
-        return !left.Equals(right);
-    }
 
     public bool Outside(IPosition min, IPosition max)
     {
@@ -93,39 +128,40 @@ public class PositionBase : IPosition, IEquatable<IPosition>, IEquatable<Positio
     }
     public long ManhattanDistance(IPosition other) => Math.Abs(other.X - this.X) + Math.Abs(other.Y - this.Y);
 
-    public static PositionBase operator -(PositionBase p1, PositionBase p2)
-    {
-        return new PositionBase(p1.X - p2.X, p1.Y - p2.Y);
-    }
 
-    public static PositionBase operator +(PositionBase p1, PositionBase p2)
-    {
-        return new PositionBase(p1.X + p2.X, p1.Y + p2.Y);
-    }
-    public static PositionBase operator *(PositionBase p1, long factor)
-    {
-        return new PositionBase(p1.X * factor, p1.Y * factor);
-    }
-    public static PositionBase operator *(PositionBase p1, PositionBase factorPosition)
-    {
-        return new PositionBase(p1.X * factorPosition.X, p1.Y * factorPosition.Y);
-    }
-    public static PositionBase operator %(PositionBase p1, long factor)
-    {
-        return new PositionBase(p1.X % factor, p1.Y % factor);
-    }
-    public static PositionBase operator %(PositionBase p1, PositionBase factorPosition)
-    {
-        return new PositionBase(p1.X % factorPosition.X, p1.Y % factorPosition.Y);
-    }
-    public static PositionBase operator /(PositionBase p1, long factor)
-    {
-        return new PositionBase(p1.X / factor, p1.Y / factor);
-    }
-    public static PositionBase operator /(PositionBase p1, PositionBase factorPosition)
-    {
-        return new PositionBase(p1.X / factorPosition.X, p1.Y / factorPosition.Y);
-    }
+//  public static PositionBase operator -(PositionBase p1, PositionBase p2)
+//  {
+//      return new PositionBase(p1.X - p2.X, p1.Y - p2.Y);
+//  }
+//
+//  public static PositionBase operator +(PositionBase p1, PositionBase p2)
+//  {
+//      return new PositionBase(p1.X + p2.X, p1.Y + p2.Y);
+//  }
+//  public static PositionBase operator *(PositionBase p1, long factor)
+//  {
+//      return new PositionBase(p1.X * factor, p1.Y * factor);
+//  }
+//  public static PositionBase operator *(PositionBase p1, PositionBase factorPosition)
+//  {
+//      return new PositionBase(p1.X * factorPosition.X, p1.Y * factorPosition.Y);
+//  }
+//  public static PositionBase operator %(PositionBase p1, long factor)
+//  {
+//      return new PositionBase(p1.X % factor, p1.Y % factor);
+//  }
+//  public static PositionBase operator %(PositionBase p1, PositionBase factorPosition)
+//  {
+//      return new PositionBase(p1.X % factorPosition.X, p1.Y % factorPosition.Y);
+//  }
+//  public static PositionBase operator /(PositionBase p1, long factor)
+//  {
+//      return new PositionBase(p1.X / factor, p1.Y / factor);
+//  }
+//  public static PositionBase operator /(PositionBase p1, PositionBase factorPosition)
+//  {
+//      return new PositionBase(p1.X / factorPosition.X, p1.Y / factorPosition.Y);
+//  }
 
     // Equality
 
@@ -156,13 +192,41 @@ public class PositionBase : IPosition, IEquatable<IPosition>, IEquatable<Positio
             throw new InvalidOperationException("hashCode has changed");
         return hashCode;
     }
+    public static bool operator ==(PositionBase? left, PositionBase? right)
+    {
+
+        if (ReferenceEquals(left, right))
+            return true;
+        return left?.Equals(right) ?? false;
+    }
+
+    public static bool operator !=(PositionBase left, PositionBase right)
+    {
+        return !left.Equals(right);
+    }
+
+    // Conversion
+    public static implicit operator (long, long)(PositionBase p)
+    {
+        return (p.X, p.Y);
+    }
+
+    public static implicit operator Vector2(PositionBase p)
+    {
+        return new Vector2((float)p.X, (float)p.Y);
+    }
 
 }
+
 
 
 public abstract class Position<TSubType> : PositionBase
     where TSubType : Position<TSubType>, new()
 {
+    public static TSubType N => North;
+    public static TSubType E => East;
+    public static TSubType S => South;
+    public static TSubType W => West;
 
     public static TSubType North { get; } = CreateSubtype(0, PositionBase.NorthIsNegative ? -1 : 1);
     public static TSubType East { get; } = CreateSubtype(+1, 0);
@@ -182,6 +246,22 @@ public abstract class Position<TSubType> : PositionBase
     public TSubType PosSouthWest => this + SouthWest;
     public TSubType PosSouthEast => this + SouthEast;
 
+    public static implicit operator Position<TSubType>(Direction dir)
+    {
+        return dir switch
+        {
+            Direction.N => North,
+            Direction.E => East,
+            Direction.S => South,
+            Direction.W => West,
+            _ => throw new ArgumentException()
+        };
+    }
+    public static implicit operator (long, long)(Position<TSubType> p)
+    {
+        return (p.X, p.Y);
+    }
+
     public TSubType Wrap(PositionBase min, PositionBase max)
     {
         var pos = CreateSubtype(this);
@@ -200,14 +280,14 @@ public abstract class Position<TSubType> : PositionBase
         return Wrap(limits.min, limits.max);
 
     }
-    public static TSubType[] Offsets { get; } =
+    public static TSubType[] Directions { get; } =
     {
         North,
         East,
         South,
         West
     };
-    public static TSubType[] AllOffsets { get; } =
+    public static TSubType[] AllDirections { get; } =
     {
         North,
         NorthEast,
@@ -258,23 +338,29 @@ public abstract class Position<TSubType> : PositionBase
         => CreateSubtype(pos);
 
 
-    // Math
-    public static Position<TSubType> operator -(Position<TSubType> p1, Position<TSubType> p2)
+    // Math --------------
+    // subtraction
+    public static TSubType operator -(TSubType p1, Position<TSubType> p2)
         => CreateSubtype(p1.X - p2.X, p1.Y - p2.Y);
-    public static Position<TSubType> operator +(Position<TSubType> p1, Position<TSubType> p2)
+    // addition
+    public static TSubType operator +(TSubType p1, Position<TSubType> p2)
         => CreateSubtype(p1.X + p2.X, p1.Y + p2.Y);
+    // multiplication
     public static Position<TSubType> operator *(Position<TSubType> p1, long factor)
         => CreateSubtype(p1.X * factor, p1.Y * factor);
-    public static Position<TSubType> operator *(Position<TSubType> p1, Position<TSubType> factorPosition)
+    public static TSubType operator *(TSubType p1, Position<TSubType> factorPosition)
         => CreateSubtype(p1.X * factorPosition.X, p1.Y * factorPosition.Y);
+    // division
+    public static Position<TSubType> operator /(Position<TSubType> p1, long divisor)
+        => CreateSubtype(p1.X / divisor, p1.Y / divisor);
+    public static TSubType operator /(TSubType p1, Position<TSubType> divisorPosition)
+        => CreateSubtype(p1.X / divisorPosition.X, p1.Y / divisorPosition.Y);
+    // modulo
     public static Position<TSubType> operator %(Position<TSubType> p1, long factor)
         => CreateSubtype(p1.X % factor, p1.Y % factor);
-    public static Position<TSubType> operator %(Position<TSubType> p1, Position<TSubType> factorPosition)
+    public static TSubType operator %(TSubType p1, Position<TSubType> factorPosition)
         => CreateSubtype(p1.X % factorPosition.X, p1.Y % factorPosition.Y);
-    public static Position<TSubType> operator /(Position<TSubType> p1, long factor)
-        => CreateSubtype(p1.X / factor, p1.Y / factor);
-    public static Position<TSubType> operator /(Position<TSubType> p1, Position<TSubType> factorPosition)
-        => CreateSubtype(p1.X / factorPosition.X, p1.Y / factorPosition.Y);
+
 
     private int _previousHash = 0;
     public override int GetHashCode()
@@ -289,7 +375,7 @@ public abstract class Position<TSubType> : PositionBase
 
     public static IEnumerable<Position> RawNeighbors(Position position)
     {
-        return Position.Offsets
+        return Position.Directions
             .Select(o => (new Position(position + o)));
     }
 }
@@ -318,6 +404,9 @@ public class LocalPosition : Position<LocalPosition>
     public LocalPosition(PositionBase pos) : base(pos)
     {
     }
+    public LocalPosition((long x,long y) pos) : base(pos.x,pos.y)
+    {
+    }
 
     public LocalPosition()
     {
@@ -339,6 +428,7 @@ public class GlobalPosition : Position<GlobalPosition>
     {
     }
 
+    
 }
 
 public class SidePosition : Position<SidePosition>
@@ -346,9 +436,16 @@ public class SidePosition : Position<SidePosition>
     public SidePosition(long x, long y) : base(x, y)
     {
     }
+    public SidePosition(Position<SidePosition> pos) : this(pos.X, pos.Y)
+    {
+    }
 
     public SidePosition()
     {
     }
 
+    public static implicit operator SidePosition((long x, long y) input)
+    {
+        return new SidePosition(input.x, input.y);
+    }
 }

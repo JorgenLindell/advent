@@ -1,8 +1,4 @@
 ﻿using common;
-using System;
-using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
-using System.Security.Cryptography;
 
 namespace _19;
 
@@ -35,15 +31,17 @@ internal class Blueprint
             { obsidian.Produces, obsidian },
             { geode.Produces, geode },
         };
+
         var bp = new Blueprint(id, robotTypes);
         return bp;
     }
 
     public Dictionary<Resource, Robot> RobotTypes { get; }
     public ResourceCounts AvailableResources = new();
+    public ResourceCounts MaxCostPerType { get; }
 
     public Dictionary<Resource, ResourceCounts> Cost { get; }
-    
+
     private Blueprint(int id, Dictionary<Resource, Robot> robotTypes)
     {
         Id = id;
@@ -55,154 +53,102 @@ internal class Blueprint
             costs[robotType.Key] = robotType.Value.Price;
         }
         Cost = costs;
+        var maxesInOrder = RobotTypes.Keys
+            .SelectMany(x => Cost[x])
+            .GroupBy(cost => cost.Resource)
+            .Select(costType => (resource: costType.Key, max: costType.Max(x => x.Value)))
+            .OrderBy(m => m.resource)
+            .Select(x => x.max)
+            .ToArray();
+        MaxCostPerType = new ResourceCounts(maxesInOrder);
     }
 
-    public virtual long Evaluate(int forTime)
+    public virtual long Evaluate(int forTime, out List<(Resource, int)> builtRobots)
     {
         var workingRobots = new ResourceCounts();
-        var cachedResults = new Dictionary<(int time, ResourceCounts robots), long>();
-        var minCachedLevel = forTime + 1;
-        var lastBestCachedOnLevel = 0L;
-        (long best, ResourceCounts robots) cacheAnalysis = (best: 0L, robots: new ResourceCounts());
+        var cachedResults = new Dictionary<(int timeLeft, Resource robotToBuild, ResourceCounts pRobots, ResourceCounts pAvailableResources), (long best, List<(Resource, int)> robots)>();
+
         workingRobots.Add(Resource.Ore, 1);
-        return Run(workingRobots, 1, AvailableResources, 0) / 1_000_000_000_000_000;
+        builtRobots = new();
+        var run = Run(workingRobots, forTime, Resource.None, AvailableResources, 0, ref builtRobots);
 
-        void SaveToCache(
-            Dictionary<(int time, ResourceCounts robots), long> cache,
-            (int time, ResourceCounts robots) cacheKey,
-            long best)
+        return run;
+
+
+        long Run(ResourceCounts pRobots, int timeLeft, Resource robotToBuild, ResourceCounts pAvailableResources, long best, ref List<(Resource, int)> pRobotsBuilt)
         {
-            cache[cacheKey] = best;
-        }
 
-        long Run(ResourceCounts robots, int time, ResourceCounts availableResources, long best)
-        {
-            if (time > 24)
-            {
-                //9,223,372,036,854,775,807
-                var totalResult = CalculateResult(robots, availableResources);
-                return totalResult;
-            }
-
-            var cacheKey = (time, robots);
+            var robotsBuilt = pRobotsBuilt.ToList();
+            var cacheKey = (timeLeft, robotToBuild, pRobots, pAvailableResources);
             if (cachedResults.ContainsKey(cacheKey))
             {
-                var cachedResult = cachedResults[cacheKey];
-                if (time < minCachedLevel || (time == minCachedLevel && cachedResult < lastBestCachedOnLevel))
-                {
-                    lastBestCachedOnLevel = cachedResult;
-                    minCachedLevel = time;
-                    Console.WriteLine($"Mincached level={time}  {cachedResult} {cacheAnalysis.robots}");
-                }
-                return cachedResult;
+                pRobotsBuilt = cachedResults[cacheKey].robots.ToList();
+                return cachedResults[cacheKey].best;
             }
-
-            var actions = AvailableActions(forTime - time, robots, availableResources).ToList();
-
-            actions.Insert(0, Resource.None); //always try not buying a robot first
-            foreach (var action in actions)
+            ResourceCounts robots = pRobots.Copy();
+            ResourceCounts availableResources = pAvailableResources.Copy();
+            if (robotToBuild != Resource.None)
             {
-                var robotsList = robots;
-                var available = availableResources;
-                var performedAction = false;
-
-                if (action == Resource.None)
+                timeLeft -= 1; //pass time for building
+                if (!SubtractPrice(availableResources, Cost[robotToBuild])) throw new InvalidDataException("Can't subtract more of resource than is available");
+                foreach ((Resource Resource, int Value) x in robots)
                 {
-                    performedAction = true;
-                }
-                else
-                {
-                    performedAction = SubtractPrice(ref available, Cost[action]);
+                    availableResources.Add(x.Resource, x.Value);
                 }
 
-
-                if (performedAction)
-                {
-                    //only if any of the action was performed
-                    robotsList.ForEach((r, i) => available.Add(r.Resource, r.Value));
-
-                    var result = Run(robotsList, time + 1, available, best);
-                    best = Math.Max(best, result);
-                }
+                robots.Add(robotToBuild, 1);
+                robotsBuilt.Add((robotToBuild, forTime - timeLeft));
             }
 
-            SaveToCache(cachedResults, cacheKey, best);
+            if (GeodesPossible(timeLeft, robots, availableResources) <= best)
+            {
+                cachedResults[cacheKey] = (0, new List<(Resource, int)>());
+                return 0; // best is better than a theoretical max based on calculation, that is good, prune this branch
+            }
+
+            pRobotsBuilt = robotsBuilt.ToList();
+
+
+            long result;
+            foreach (var robotType in availableResources.Keys)
+            {
+                var robotsBuiltInner = pRobotsBuilt.ToList();
+                //check all types
+                var timeToWait = TurnsToGet(robotType, timeLeft, robots, availableResources);
+                if (timeToWait == -1)
+                    continue;
+                var availableInner = availableResources.Copy();
+                foreach ((Resource Resource, int Value) x in robots)
+                    availableInner.Add(x.Resource, x.Value * timeToWait);
+
+                var timeLeftAfterWait = timeLeft - timeToWait;
+
+                result = Run(
+                    robots,
+                    timeLeftAfterWait,
+                    robotType,
+                    availableInner,
+                    best,
+                    ref robotsBuiltInner
+                );
+                if (result > best)
+                {
+                    robotsBuilt = robotsBuiltInner.ToList();
+                    best = result;
+                }
+            }
+            // at the end, nothing is bought, just geode robots producing.
+            result = availableResources[Resource.Geode] + robots[Resource.Geode] * timeLeft;
+            best = Math.Max(result, best);
+            pRobotsBuilt = robotsBuilt.ToList();
             return best;
         }
 
-        long CalculateResult(ResourceCounts robots, ResourceCounts availableResources)
-        {
-            var totalResult = availableResources[Resource.Geode] * 1_000_000_000_000_000L
-                              + availableResources[Resource.Obsidian] * 10_000_000_000_000L
-                              + availableResources[Resource.Clay] * 100_000_000_000L
-                              + availableResources[Resource.Ore] * 1_000_000_000L;
-            var multiplier = 1_000_000_000L / 100;
-            var additional = robots.OrderBy(x => x.Resource).Sum(r =>
-            {
-                multiplier /= 25;
-                return r.Value * multiplier;
-            });
-            totalResult += additional;
-            if (cacheAnalysis.best < totalResult)
-            {
-                cacheAnalysis.best = totalResult;
-                cacheAnalysis.robots = robots;
-                Console.WriteLine($"Mincached = {cacheAnalysis.robots}");
-            }
-
-            return totalResult;
-        }
-    }
-
-    List<Resource> AvailableActions(int timeLeft, ResourceCounts commonProduction, ResourceCounts available)
-    {
-
-        var list = new List<Resource>();
-
-        var maxCostInOre = RobotTypes.Keys
-            .Where(x => x > Resource.Ore)
-            .Max(x => Cost[x][Resource.Ore]);
-        if (commonProduction[Resource.Ore] < maxCostInOre
-            && timeLeft > 4
-           )
-            list.Add(Resource.Ore);
-
-        var maxCostInClay = RobotTypes.Keys
-            .Where(x => x > Resource.Clay)
-            .Max(x => Cost[x][Resource.Clay]);
-        if (commonProduction[Resource.Clay] < maxCostInClay
-            && timeLeft > 3
-            )
-            list.Add(Resource.Clay);
-
-        var maxCostInObsidian = RobotTypes.Keys
-            .Where(x => x > Resource.Obsidian)
-            .Max(x => Cost[x][Resource.Obsidian]);
-        if (commonProduction[Resource.Obsidian] < maxCostInObsidian
-            && commonProduction[Resource.Clay] > 0
-            && timeLeft > 2
-            )
-            list.Add(Resource.Obsidian);
-
-
-        if (commonProduction[Resource.Obsidian] > 0)
-            list.Add(Resource.Geode);
-
-        for (int i = list.Count - 1; i >= 0; i--)
-        {
-            var robotType = list[i];
-            if (!HasResources(available, RobotTypes[robotType].Price))
-            {
-                list.RemoveAt(i);
-            }
-        }
-        list.Reverse();
-
-        return list;
     }
 
 
-    private bool SubtractPrice(ref ResourceCounts available, ResourceCounts price)
+
+    private bool SubtractPrice(ResourceCounts available, ResourceCounts price)
     {
         if (!HasResources(available, price))
             return false;
@@ -222,5 +168,64 @@ internal class Blueprint
         }
 
         return true;
+    }
+    private int TurnsToGet(Resource robotType,
+        int timeLeft,
+        ResourceCounts currentRobots,
+        ResourceCounts available)
+    {
+        if (robotType != Resource.Geode
+            && available[robotType] + currentRobots[robotType] * timeLeft >= MaxCostPerType[robotType] * timeLeft)
+            return -1;  // Getting one is no help as production would exceed what can be consumed
+
+        var turnsToWait = 0;
+        foreach (var resType in available.Keys)
+        {   // check each type of resource available and needed for the required robotType
+            int avail = available[resType];
+            int cost = Cost[robotType][resType];
+            int robots = currentRobots[resType];
+
+            if (cost == 0 || avail >= cost)
+                continue; // we have that
+            if (robots == 0)
+                return -1; // Cannot get enough materials by waiting, no one is producing
+            turnsToWait = Math.Max(turnsToWait,
+                (int)Math.Ceiling(
+                    (cost - avail) // how much is missing?
+                     / (decimal)robots) //how much is produced each step?
+                ); //round up
+        }
+        if (turnsToWait < timeLeft - 1)
+            return turnsToWait; // there is time enough
+        return -1; // Time to purchase longer than time remaining
+    }
+
+
+    public int GeodesPossible(int timeLeft, ResourceCounts robots, ResourceCounts available)
+    {
+        /*
+         * (timeLeft * (timeLeft - 1)) / 2
+         * if we have timeLeft=5 then formula gives 10
+         * step 5 build 1 giving 1 produce 0
+         * step 4 build 1 giving 2 produce 1 sum of produced 1
+         * step 3 build 1 giving 3 produce 2 sum of produced 3
+         * step 2 build 1 giving 4 produce 3 sum of produced 6
+         * step 1 build 1 giving 5 produce 4 sum of produced 10
+         */
+
+        var maxObsidian = available[Resource.Obsidian] // with what we have
+                          + robots[Resource.Obsidian] * timeLeft // what can be produce with current robots
+                          + (timeLeft * (timeLeft - 1)) / 2; //if we can build one each step
+
+        var maxNewGeodeRobots = maxObsidian / Cost[Resource.Geode][Resource.Obsidian];
+        var productionGeodesCurrent = available[Resource.Geode] + robots[Resource.Geode] * timeLeft;
+        if (maxNewGeodeRobots >= timeLeft) // there is time for this
+            return productionGeodesCurrent // with what we have
+                   + (timeLeft * (timeLeft - 1)) / 2; // if we can build one each step
+        return (
+            productionGeodesCurrent // with what we have
+            + (maxNewGeodeRobots * (maxNewGeodeRobots - 1)) / 2 // if we can build this many in subsequent steps
+            + (timeLeft - maxNewGeodeRobots) * maxNewGeodeRobots // and the steps none is built, just producing
+        );
     }
 }

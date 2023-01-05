@@ -6,28 +6,33 @@ using System.Linq;
 namespace common.SparseMatrix;
 
 public class SparseMatrix<TKey, TValue> : SparseMatrix<TKey, TValue, TKey>
-    where TKey : notnull
+    where TKey : notnull,new()
 {
 }
 public class SparseMatrix<TKey, TValue,TKeyBase> : IEnumerable<(TKey, TValue)>
-    where TKey : TKeyBase
-    where TKeyBase : notnull
+    where TKey : TKeyBase,new()
+    where TKeyBase : notnull 
 {
 
     private readonly Dictionary<TKeyBase, Cell> _list = new();
     public IEnumerable<TValue> Values => _list.Values.Select(c => c.Value).Where(x => x != null).Cast<TValue>();
     public IEnumerable<TKey> Keys => _list.Keys.Cast<TKey>();
 
-    public Cell CellAt(TKey key)
+    public TValue? this[TKeyBase key] => _list[key].Value;
+    public bool ContainsKey(TKeyBase key) => _list.ContainsKey(key);
+
+    public Cell CellAt(TKeyBase key)
     {
         if (_list.ContainsKey(key))
             return _list[key];
         return new Cell(key, this);
     }
-    public TValue? Value(TKey key)
+   
+    public TValue? Value(TKeyBase key)
     {
         return CellAt(key).Value;
     }
+  
     public virtual TValue? Value(TKey key, TValue newValue)
     {
         return CellAt(key).Value = newValue;
@@ -94,4 +99,5 @@ public class SparseMatrix<TKey, TValue,TKeyBase> : IEnumerable<(TKey, TValue)>
     {
         return GetEnumerator();
     }
+
 }

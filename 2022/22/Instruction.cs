@@ -7,7 +7,12 @@
     public Instruction(int steps, char turn)
     {
         Steps = steps;
-        Turn = turn == 'L' ? Rotate.Left : Rotate.Right;
+        Turn = turn switch
+        {
+            'L' => Rotate.Left,
+            'R' => Rotate.Right,
+            _ => 0
+        };
     }
 
     public override string ToString() => $"{Steps} {Turn}";

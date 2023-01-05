@@ -76,47 +76,6 @@ namespace common
         }
     }
 
-    public static class ZipExtension
-    {
-        public static IEnumerable<(T1, T2)> Zip<T1, T2>(this IEnumerable<T1> t1, IEnumerable<T2> t2)
-        {
-            using var t1E = t1.GetEnumerator();
-            using var t2E = t2.GetEnumerator();
-            while (t1E.MoveNext() && t2E.MoveNext())
-                yield return (t1E.Current, t2E.Current);
-        }
-        public static IEnumerable<(T1, T2, T3)> Zip<T1, T2, T3>(this IEnumerable<T1> t1, IEnumerable<T2> t2, IEnumerable<T3> t3)
-        {
-            using var t1E = t1.GetEnumerator();
-            using var t2E = t2.GetEnumerator();
-            using var t3E = t3.GetEnumerator();
-            while (t1E.MoveNext() && t2E.MoveNext() && t3E.MoveNext())
-                yield return (t1E.Current, t2E.Current, t3E.Current);
-        }
-        public static IEnumerable<(T1, T2, T3, T4)> Zip<T1, T2, T3, T4>(this IEnumerable<T1> t1, IEnumerable<T2> t2, IEnumerable<T3> t3, IEnumerable<T4> t4)
-        {
-            using var t1E = t1.GetEnumerator();
-            using var t2E = t2.GetEnumerator();
-            using var t3E = t3.GetEnumerator();
-            using var t4E = t4.GetEnumerator();
-            while (t1E.MoveNext() && t2E.MoveNext() && t3E.MoveNext() && t4E.MoveNext())
-                yield return (t1E.Current, t2E.Current, t3E.Current, t4E.Current);
-        }
-        public static IEnumerable<(T1, T2, T3, T4, T5)> Zip<T1, T2, T3, T4, T5>(this IEnumerable<T1> t1, IEnumerable<T2> t2,
-            IEnumerable<T3> t3, IEnumerable<T4> t4, IEnumerable<T5> t5)
-        {
-            using var t1E = t1.GetEnumerator();
-            using var t2E = t2.GetEnumerator();
-            using var t3E = t3.GetEnumerator();
-            using var t4E = t4.GetEnumerator();
-            using var t5E  = t5.GetEnumerator(); ;
-            while (t1E.MoveNext() && t2E.MoveNext() && t3E.MoveNext() && t4E.MoveNext())
-            {
-                yield return (t1E.Current, t2E.Current, t3E.Current, t4E.Current,t5E.Current);
-            }
-        }
-    }
-
     public static class PermutationExtension
     {
         public static IEnumerable<IEnumerable<T>> GetPermutations<T>(this IEnumerable<T> enumerable)

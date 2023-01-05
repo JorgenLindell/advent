@@ -1,59 +1,48 @@
-﻿using System.Collections;
-using common;
+﻿using System;
+using System.Collections;
+using System.Runtime.CompilerServices;
+using System.Xml.XPath;
 
 namespace _19;
 
-internal struct ResourceCounts : IEquatable<ResourceCounts>, IEnumerable<(Resource Resource, int Value)>
+internal class ResourceCounts : IEquatable<ResourceCounts>, IEnumerable<(Resource Resource, int Value)>
 {
-    private int[] _counts = new int[4];
+    private static Resource[] StaticKeys { get; } = Enumerable.Range((int)Resource.Ore, 4).Cast<Resource>().ToArray();
+    public int[] Counts { get; } = new int[4];
 
-    private int[] Counts
-    {
-        readonly get => _counts;
-        set => _counts = value;
-    }
+    public Resource[] Keys => StaticKeys;
 
-    public IEnumerable<Resource> Keys => Enumerable.Range((int)Resource.Ore,4).Cast<Resource>();
     public ResourceCounts()
     {
-        Counts = new[] { 0, 0, 0, 0 };
     }
     public ResourceCounts(ResourceCounts other)
     {
         Counts = other.Counts.ToArray();
     }
 
-    public ResourceCounts(int[] toArray)
+    public ResourceCounts(int[] array)
     {
-        Counts = toArray.ToArray();
+        Counts = array.ToArray();
     }
+    public ResourceCounts Copy()=>new (Counts);
 
-    public int this[Resource index]
-    {
-        get => Counts[((int)index) - 1];
-        private set => Counts[((int)index) - 1] = value;
-    }
-    public int this[int ix]
-    {
-        get => Counts[ix];
-        private set => Counts[ix] = value;
-    }
+    public int this[Resource index] => Counts[index - Resource.Ore];
 
-    public ResourceCounts Add(Robot robot)
-    {
-        var newCounts = new ResourceCounts(this);
-        newCounts[robot.Produces]++;
-        return newCounts;
-    }
+
     public void Add(Resource res, int amount)
     {
-        this[res] += amount;
+        Counts[res - Resource.Ore]+= amount;
+    }
+    private void Add(int index, int amount)
+    {
+        Counts[index] += amount;
     }
 
-
-    public bool Equals(ResourceCounts other)
+    public bool Equals(ResourceCounts? other)
     {
-        return Counts.Equals(other.Counts);
+        if (ReferenceEquals(other, null)) return false;
+        if (ReferenceEquals(other, this)) return true;
+        return Counts.SequenceEqual(other.Counts);
     }
     public override bool Equals(object? obj)
     {
@@ -61,7 +50,7 @@ internal struct ResourceCounts : IEquatable<ResourceCounts>, IEnumerable<(Resour
     }
     public override int GetHashCode()
     {
-        return Counts.GetHashCode();
+        return HashCode.Combine(Counts[0], Counts[1], Counts[2], Counts[3]);
     }
     public static bool operator ==(ResourceCounts left, ResourceCounts right)
     {
@@ -72,16 +61,37 @@ internal struct ResourceCounts : IEquatable<ResourceCounts>, IEnumerable<(Resour
         return !left.Equals(right);
     }
 
+    public static ResourceCounts operator -(ResourceCounts left, ResourceCounts right)
+    {
+        var result = new ResourceCounts(left);
+        for (int i = 0; i < 4; i++)
+        {
+            result.Add(i, -right.Counts[i]);
+        }
+
+        return result;
+    }
+
+    public static ResourceCounts operator +(ResourceCounts left, ResourceCounts right)
+    {
+        var result = new ResourceCounts(left);
+        for (int i = 0; i < 4; i++)
+        {
+            result.Add(i, right.Counts[i]);
+        }
+        return result;
+    }
+
     public IEnumerator GetEnumerator()
     {
-        foreach (var res in Keys)
+        foreach (Resource res in Keys)
         {
-            yield return (Resource:res,Value:this[res]);
+            yield return (Resource: res, Value: this[res]);
         }
     }
     IEnumerator<(Resource Resource, int Value)> IEnumerable<(Resource Resource, int Value)>.GetEnumerator()
     {
-        foreach (var res in Keys)
+        foreach (Resource res in Keys)
         {
             yield return (Resource: res, Value: this[res]);
         }

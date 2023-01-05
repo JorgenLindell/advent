@@ -12,7 +12,7 @@ Blueprint 2:Each ore robot costs 2 ore.  Each clay robot costs 3 ore.  Each obsi
             //@""
             .Replace("\r\n", "\n");
 
-    private static readonly bool _debug = true;
+    private static readonly bool _debug = false;
 
     private static void Main(string[] args)
     {
@@ -29,6 +29,26 @@ Blueprint 2:Each ore robot costs 2 ore.  Each clay robot costs 3 ore.  Each obsi
 
     private static void SecondPart(Func<TextReader> getDataStream)
     {
+        var lines = Load(getDataStream());
+
+        var blueprints = new List<Blueprint>();
+        lines.ForEach(x => blueprints.Add(Blueprint.Parse(x)));
+
+        Debug.WriteLine($"=============== Part 2: =================");
+
+        List<long> results = new();
+        foreach (var blueprint in blueprints.Take(3))
+        {
+            var geodes = blueprint.Evaluate(32, out var builtRobots);
+            results.Add(geodes);
+            Debug.WriteLine($"Blueprint {blueprint.Id}= {geodes}  quality= {geodes * blueprint.Id}");
+            foreach (var builtRobot in builtRobots.Take(3))
+            {
+                //              Debug.WriteLine($"{builtRobot.Item1} {builtRobot.Item2}");
+            }
+        }
+        Debug.WriteLine($"Product of 3 first of all blueprints {results[0] * results[1] * results[2]}");
+
     }
 
 
@@ -40,15 +60,25 @@ Blueprint 2:Each ore robot costs 2 ore.  Each clay robot costs 3 ore.  Each obsi
         lines.ForEach(x => blueprints.Add(Blueprint.Parse(x)));
 
 
+
+        Debug.WriteLine($"=============== Part 1: =================");
+        List<long> results = new();
+
         foreach (var blueprint in blueprints)
         {
-            var geodes = blueprint.Evaluate(24);
-            Debug.WriteLine($"Blueprint {blueprint.Id}={geodes} ");
-
+            var geodes = blueprint.Evaluate(24, out var builtRobots);
+            results.Add(geodes * blueprint.Id);
+            Debug.WriteLine($"Blueprint {blueprint.Id}= {geodes}  quality= {geodes * blueprint.Id}");
+            foreach (var builtRobot in builtRobots)
+            {
+                //             Debug.WriteLine($"{builtRobot.Item1} {builtRobot.Item2}");
+            }
         }
+        Debug.WriteLine($"Sum of all blueprints {results.Sum()}");
+
     }
 
-   
+
 
 
     private static List<string> Load(TextReader stream)

@@ -1,4 +1,6 @@
 ﻿
+using common.SparseMatrix;
+
 namespace _24;
 
 internal class Walker

@@ -1,13 +1,15 @@
-﻿namespace _24;
+﻿using common.SparseMatrix;
+
+namespace _24;
 
 internal class Blizzard
 {
     private static int _counter;
 
-    public Blizzard(int x, int y, Offset direction, char c)
+    public Blizzard(int x, int y, Direction direction, char c)
     {
         Direction = direction;
-        Step = Position.Offsets[(int)direction];
+        Step = Position.Directions[(int)direction];
 
         StartPos = new Position(x, y);
         Pos = new Position(x, y);
@@ -16,7 +18,7 @@ internal class Blizzard
     }
 
     public static Matrix? Matrix { get; set; }
-    public Offset Direction { get; }
+    public Direction Direction { get; }
     public Position Pos { get; set; }
     public Position StartPos { get; set; }
     public char Symbol { get; set; }
