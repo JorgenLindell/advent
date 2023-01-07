@@ -1,6 +1,7 @@
 ﻿
 using System.Diagnostics;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using common;
 
 
@@ -23,8 +24,8 @@ Valve JJ has flow rate=21; tunnel leads to valve II"
     private static bool _debug = false;
     private static void Main(string[] args)
     {
-        FirstPart(GetDataStream );
-        SecondPart(GetDataStream );
+        FirstPart(GetDataStream);
+        SecondPart(GetDataStream);
     }
 
     private static TextReader GetDataStream() =>
@@ -34,89 +35,75 @@ Valve JJ has flow rate=21; tunnel leads to valve II"
 
     private static void SecondPart(Func<TextReader> stream)
     {
-        Dictionary<string, Node> nodes;
-        nodes = LoadFile(stream());
+        // got an elephant to help
+        Dictionary<string, Node> nodes = LoadFile(stream());
 
         var startNode = nodes["AA"];
-        var cache = new Dictionary<string, int>();
-        var productiveNodesCount = nodes.Values.Count(x => x.Flow > 0);
+        var productiveNodesCount = nodes.Values.Count(x => x.Flow > 0); // don't spend time trying to open those that have no flow
+        var cache = new Dictionary<(int, ulong, int, bool), int>();
 
-        var result = MaxFlow(startNode, 0ul, 26, false);
-        Debug.WriteLine("result=" + result);
-
-
-
-        int MaxFlow(Node current, ulong openedBm, int timeLeft, bool elephant)
-        {
-            if (BitCounter.CountSetBits(openedBm) == productiveNodesCount)
-                return 0;
-
-            if (timeLeft <= 0)
-            {
-                if (!elephant)
-                {
-                    return MaxFlow(startNode, openedBm, 26, true);
-                }
-                return 0;
-            }
-
-            var key = $"{current.Name};{openedBm};{((char)timeLeft)};{elephant}";
-            if (cache.ContainsKey(key))
-                return cache[key];
-
-            var maxFlow = 0;
-            if (current.Flow > 0 && ((openedBm & (1u << current.Number)) == 0))
-            {
-                maxFlow = (current.Flow * (timeLeft - 1)) + MaxFlow(current, openedBm | 1u << current.Number, timeLeft - 1, elephant);
-            }
-            foreach (var edge in current.Edges.Values)
-            {
-                maxFlow = Math.Max(maxFlow, MaxFlow(edge.To, openedBm, timeLeft - 1, elephant));
-            }
-
-            cache[key] = maxFlow;
-            return maxFlow;
-        }
+        var sw = new Stopwatch();
+        sw.Start();
+        var result = MaxFlow(startNode, 0ul, 26, false, true, productiveNodesCount, startNode, cache);
+        sw.Stop();
+        Console.WriteLine($"{sw.Elapsed:g}  result={result}");
     }
+
 
     private static void FirstPart(Func<TextReader> stream)
     {
+        // no helper available, work for 30 minutes
+
         Dictionary<string, Node> nodes = LoadFile(stream());
         var startNode = nodes["AA"];
-        var maxTime = 30;
-        var cache = new Dictionary<string, int>();
-        var productiveNodesCount = nodes.Values.Count(x => x.Flow > 0);
+        var productiveNodesCount = nodes.Values.Count(x => x.Flow > 0); // don't spend time trying to open those that have no flow
+        var cache = new Dictionary<(int,ulong,int,bool), int>();
+        var sw = new Stopwatch();
+        sw.Start();
+        var result = MaxFlow(startNode, 0ul, 30, false, false,  productiveNodesCount, startNode, cache);
+        sw.Stop();
+        Console.WriteLine($"{sw.Elapsed:g}  result={result}");
+    }
 
-        var result = MaxFlow(startNode, 0ul, maxTime);
-        Debug.WriteLine("result=" + result);
 
-        int MaxFlow(Node current, ulong openedBm, int timeLeft)
+    private static int MaxFlow(Node current, ulong openedBm, int timeLeft, bool elephant, bool useElephant, int productiveNodesCount, Node startNode, Dictionary<(int, ulong, int, bool), int> cache)
+    {
+        // calculate max flow in a subtree of the solution space
+
+        if (BitCounter.CountSetBits(openedBm) == productiveNodesCount)
+            return 0; // we are done with the ones meaningful to open.
+
+        if (timeLeft <= 0)
         {
-            if (BitCounter.CountSetBits(openedBm) == productiveNodesCount)
-                return 0;
-
-            if (timeLeft <= 0) return 0;
-
-            var key = $"{current.Name};{openedBm};{((char)timeLeft)}";
-            if (cache.ContainsKey(key))
-                return cache[key];
-
-
-            var maxFlow = 0;
-            if (current.Flow > 0 && ((openedBm & (1u << current.Number)) == 0))
+            if (!elephant && useElephant)
             {
-                maxFlow = (current.Flow * (timeLeft - 1)) + MaxFlow(current, openedBm | 1u << current.Number, timeLeft - 1);
+                // if we have an elephant helper, let it work with those nodes I couldn't open in time
+                // this is done at the end of EACH of my tries, so it will find those where we work best in "tandem".
+                return MaxFlow(startNode, openedBm, 26, true, useElephant, productiveNodesCount, startNode, cache);
             }
-            foreach (var edge in current.Edges.Values)
-            {
-                maxFlow = Math.Max(maxFlow, MaxFlow(edge.To, openedBm, timeLeft - 1));
-            }
-
-            cache[key] = maxFlow;
-            return maxFlow;
+            return 0; // no elephant or the elephant is at end of time, nothing more can be produced.
         }
 
+        var key = (current.Number,openedBm,timeLeft,elephant);
+        if (cache.ContainsKey(key))
+            return cache[key]; // we have been at this state before, no need to calculate subtree again.
+
+        var maxFlow = 0;
+        if (current.Flow > 0 && openedBm.IsBitClear(current.Number))
+        {
+            maxFlow = current.Flow * (timeLeft - 1); // this node will produce 
+            maxFlow += MaxFlow(current, openedBm.SetBit(current.Number), timeLeft - 1, elephant, useElephant, productiveNodesCount, startNode, cache);
+        }
+        foreach (var edge in current.Edges.Values)
+        {
+            var flow = MaxFlow(edge.To, openedBm, timeLeft - 1, elephant, useElephant, productiveNodesCount, startNode, cache);
+            maxFlow = Math.Max(maxFlow, flow);
+        }
+
+        cache[key] = maxFlow;
+        return maxFlow;
     }
+
 
     private static Dictionary<string, Node> LoadFile(TextReader stream)
     {
@@ -131,10 +118,10 @@ Valve JJ has flow rate=21; tunnel leads to valve II"
             var name = parts[1];
             var flow = parts[5].ToInt()!.Value;
             var connected = parts.Skip(10).ToList();
-            nodeList[name] = new Node(name, flow, connected, i++);
-
+            nodeList[name] = new Node(name, flow, connected,i);
+            i++;
         }
-        nodeList.Values.ForEach((n, i) =>
+        nodeList.Values.ForEach((n, _) =>
         {
             n.Connect(nodeList);
         });
@@ -149,8 +136,6 @@ internal class Node
     public int Number { get; set; }
     public int Flow { get; }
     public Dictionary<string, Edge> Edges { get; } = new();
-    public int IsOpen { get; set; } = 0;
-    public int Visited { get; set; } = 0;
 
     public Node(string name, int flow, List<string> connected, int number)
     {
@@ -191,17 +176,16 @@ internal class Edge
 
 public struct BitCounter
 {
-    private static byte[] BitsSetTable256 { get; } = new byte[256];
+    private static int[] BitsSetTable256 { get; } = new int[256];
     static BitCounter()
     {
         BitsSetTable256[0] = 0;
         for (var i = 0; i < 256; i++)
         {
-            var bi = (byte)i;
-            BitsSetTable256[i] = (byte)((bi & 1) + BitsSetTable256[i / 2]);
+            BitsSetTable256[i] = ((i & 1) + BitsSetTable256[i / 2]);
         }
     }
-
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int CountSetBits(ulong bm)
     {
         var bytes = BitConverter.GetBytes(bm);
@@ -212,5 +196,20 @@ public struct BitCounter
 
     }
 
+}
+
+public static class BmExtension
+{
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool IsBitClear(this ulong openedBm, int bit)
+    {
+        return (openedBm & (1ul << bit)) == 0;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static ulong SetBit(this ulong openedBm, int bit)
+    {
+        return (openedBm | (1ul << bit));
+    }
 }
 
