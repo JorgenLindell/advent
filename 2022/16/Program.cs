@@ -1,6 +1,8 @@
 ﻿
+using System.Collections;
 using System.Diagnostics;
 using System.Net.Sockets;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 using common;
 
@@ -21,7 +23,11 @@ Valve II has flow rate=0; tunnels lead to valves AA, JJ
 Valve JJ has flow rate=21; tunnel leads to valve II"
             .Replace("\r\n", "\n");
 
-    private static bool _debug = false;
+    // ReSharper disable once InconsistentNaming
+    private const bool _debug = false;
+    public static long NumberOfCalls { get; set; }
+    public static long SavedByCache { get; set; }
+
     private static void Main(string[] args)
     {
         FirstPart(GetDataStream);
@@ -40,14 +46,17 @@ Valve JJ has flow rate=21; tunnel leads to valve II"
 
         var startNode = nodes["AA"];
         var productiveNodesCount = nodes.Values.Count(x => x.Flow > 0); // don't spend time trying to open those that have no flow
-        var cache = new Dictionary<(int, ulong, int, bool), int>();
-
+        var cache = new Dictionary<(int, ulong, int, bool), (int flow, long calls)>();
         var sw = new Stopwatch();
         sw.Start();
+        Program.NumberOfCalls = 0;
+        Program.SavedByCache = 0;
         var result = MaxFlow(startNode, 0ul, 26, false, true, productiveNodesCount, startNode, cache);
         sw.Stop();
         Console.WriteLine($"{sw.Elapsed:g}  result={result}");
+        Console.WriteLine($"{NumberOfCalls} {SavedByCache}  {NumberOfCalls-SavedByCache}");
     }
+
 
 
     private static void FirstPart(Func<TextReader> stream)
@@ -57,17 +66,21 @@ Valve JJ has flow rate=21; tunnel leads to valve II"
         Dictionary<string, Node> nodes = LoadFile(stream());
         var startNode = nodes["AA"];
         var productiveNodesCount = nodes.Values.Count(x => x.Flow > 0); // don't spend time trying to open those that have no flow
-        var cache = new Dictionary<(int,ulong,int,bool), int>();
+        var cache = new Dictionary<(int, ulong, int, bool), (int flow, long calls)>();
         var sw = new Stopwatch();
         sw.Start();
+        Program.NumberOfCalls = 0;
+        Program.SavedByCache = 0;
         var result = MaxFlow(startNode, 0ul, 30, false, false,  productiveNodesCount, startNode, cache);
         sw.Stop();
         Console.WriteLine($"{sw.Elapsed:g}  result={result}");
+        Console.WriteLine($"{NumberOfCalls} {SavedByCache}  {NumberOfCalls-SavedByCache}");
     }
 
 
-    private static int MaxFlow(Node current, ulong openedBm, int timeLeft, bool elephant, bool useElephant, int productiveNodesCount, Node startNode, Dictionary<(int, ulong, int, bool), int> cache)
+    private static int MaxFlow(Node current, ulong openedBm, int timeLeft, bool elephant, bool useElephant, int productiveNodesCount, Node startNode, Dictionary<(int, ulong, int, bool), (int flow, long calls)> cache)
     {
+        Program.NumberOfCalls++;
         // calculate max flow in a subtree of the solution space
 
         if (BitCounter.CountSetBits(openedBm) == productiveNodesCount)
@@ -84,9 +97,15 @@ Valve JJ has flow rate=21; tunnel leads to valve II"
             return 0; // no elephant or the elephant is at end of time, nothing more can be produced.
         }
 
+        var numberOfCallsToHere = Program.NumberOfCalls;
         var key = (current.Number,openedBm,timeLeft,elephant);
         if (cache.ContainsKey(key))
-            return cache[key]; // we have been at this state before, no need to calculate subtree again.
+        {
+            var cached = cache[key];
+            Program.SavedByCache += cached.calls;
+            Program.NumberOfCalls += cached.calls;
+            return cached.flow; // we have been at this state before, no need to calculate subtree again.
+        }
 
         var maxFlow = 0;
         if (current.Flow > 0 && openedBm.IsBitClear(current.Number))
@@ -100,9 +119,12 @@ Valve JJ has flow rate=21; tunnel leads to valve II"
             maxFlow = Math.Max(maxFlow, flow);
         }
 
-        cache[key] = maxFlow;
+        var numberOfCallsBelow = Program.NumberOfCalls - numberOfCallsToHere;
+
+        cache[key] = (flow:maxFlow,calls:numberOfCallsBelow);
         return maxFlow;
     }
+
 
 
     private static Dictionary<string, Node> LoadFile(TextReader stream)
@@ -174,7 +196,7 @@ internal class Edge
     }
 }
 
-public struct BitCounter
+public static class BitCounter
 {
     private static int[] BitsSetTable256 { get; } = new int[256];
     static BitCounter()
@@ -185,21 +207,20 @@ public struct BitCounter
             BitsSetTable256[i] = ((i & 1) + BitsSetTable256[i / 2]);
         }
     }
+
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int CountSetBits(ulong bm)
     {
         var bytes = BitConverter.GetBytes(bm);
-        return BitsSetTable256[bytes[0]]
-               + BitsSetTable256[bytes[1]]
-               + BitsSetTable256[bytes[2]]
-               + BitsSetTable256[bytes[3]];
+   //     return bytes.Sum(b => BitsSetTable256[b]);
+      return BitsSetTable256[bytes[0]]
+             + BitsSetTable256[bytes[1]]
+             + BitsSetTable256[bytes[2]]
+             + BitsSetTable256[bytes[3]];
 
     }
 
-}
-
-public static class BmExtension
-{
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool IsBitClear(this ulong openedBm, int bit)
     {
@@ -212,4 +233,5 @@ public static class BmExtension
         return (openedBm | (1ul << bit));
     }
 }
+
 
