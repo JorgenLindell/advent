@@ -3,6 +3,7 @@ using System.Reflection.Emit;
 using _24;
 using common;
 using common.SparseMatrix;
+using Direction = common.SparseMatrix.Direction;
 
 
 //https://adventofcode.com/2022/day/23

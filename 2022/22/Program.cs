@@ -4,6 +4,7 @@ using System.Text;
 using _22;
 using common;
 using common.SparseMatrix;
+using Direction = common.SparseMatrix.Direction;
 
 
 //https://adventofcode.com/2022/day/22

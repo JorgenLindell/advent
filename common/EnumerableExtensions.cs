@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -7,6 +8,21 @@ namespace common
 {
     public static class EnumerableExtensions
     {
+        public static IEnumerable<IEnumerable<T>> Pivot<T>(this IEnumerable<IEnumerable<T>> source)
+        {
+            var enumerators = source.Select(e => e.GetEnumerator()).ToArray();
+            try
+            {
+                while (enumerators.All(e => e.MoveNext()))
+                {
+                    yield return enumerators.Select(e => e.Current).ToArray();
+                }
+            }
+            finally
+            {
+                Array.ForEach(enumerators, e => e.Dispose());
+            }
+        }
         public static bool In<T>(this T src, params T[] elems)
         {
             return elems.Contains(src);
@@ -74,6 +90,35 @@ namespace common
                 }
             }
         }
+        public static int TranslateVirtualIndex(this IList list, int index)
+        {
+             var listCount = list.Count;
+           return index < 0 ? listCount + index % listCount : index % listCount;
+        }
+        public static T GetVirtualIndex<T>(this List<T> list, int index)
+        {
+            return list[list.TranslateVirtualIndex(index)];
+        }
+        public static IEnumerable<char> RepeatChars(this string str)
+        {
+            while (true)
+            {
+                foreach (char c in str)
+                {
+                    if (c == 0)
+                        yield break;
+                    yield return c;
+                }
+            }
+        }
+
+        public static void AddRange<T>(this HashSet<T> set, IEnumerable<T> range)
+        {
+            foreach (var item in range)
+            {
+                set.Add(item);
+            }
+        }
     }
 
     public static class PermutationExtension
@@ -138,6 +183,11 @@ namespace common
             }
 
             return result;
+        }
+
+        public static int SimpleLength(this System.Range range)
+        {
+            return range.End.Value - range.Start.Value + 1;
         }
     }
 }
