@@ -5,7 +5,40 @@ using common;
 
 namespace _25
 {
+    internal static class LocalExtensions
+    {
+        public static IEnumerable<IEnumerable<T>> Permute<T>(this IEnumerable<T> sequence)
+        {
+            if (sequence == null)
+            {
+                yield break;
+            }
 
+            var list = sequence.ToList();
+
+            if (!list.Any())
+            {
+                yield return Enumerable.Empty<T>();
+            }
+            else
+            {
+                var startingElementIndex = 0;
+
+                foreach (var startingElement in list)
+                {
+                    var index = startingElementIndex;
+                    var remainingItems = list.Where((e, i) => i != index);
+
+                    foreach (var permutationOfRemainder in remainingItems.Permute())
+                    {
+                        yield return permutationOfRemainder.Prepend(startingElement);
+                    }
+
+                    startingElementIndex++;
+                }
+            }
+        }
+    }
     internal class Program
     {
 
@@ -29,7 +62,7 @@ frs: qnr lhk lsr";
 
         static async Task Main(string[] args)
         {
-            var strings = xinput.Split("\r\n", Tidy);
+            var strings = input.Split("\r\n", Tidy);
             var connections = strings.SelectMany(s =>
             {
                 var all = s.Split(": ".ToCharArray(), Tidy);
@@ -52,12 +85,10 @@ frs: qnr lhk lsr";
 
             string Disconnect3()
             {
-                var disconnected = 0;
-                string name1;
                 var dict = new Dictionary<string, HashSet<string>>();
                 for (int i = 0; i < 6; i++)
                 {
-                    name1 = centrality[i].Key;
+                    string name1 = centrality[i].Key;
                     Debug.Write($"{name1}: ");
                     dict[name1] = new HashSet<string>();
                     for (int j = 0; j < 6; j++)
@@ -67,63 +98,77 @@ frs: qnr lhk lsr";
                         {
                             Debug.Write($"{name2} ");
                             dict[name1].Add(name2);
-                            //   components[name1].Remove(name2);
-                            //   components[name2].Remove(name1);
-                            //   disconnected++;
-                            //   Debug.WriteLine($"{disconnected} Disconnect {name1}:{name2}");
-                            //   if (disconnected == 3) return name1;
-                            //   break;
-
                         }
                     }
                     Debug.WriteLine("");
                 }
                 var remove = dict.OrderBy(x => x.Value.Count).Select(x => x.Key).ToList();
-                var combinations = Combinations(remove, 0, 2)
-                    .Where(x => components[x[0]].Contains(x[1]))
+                var permute = remove.Permute();
+
+
+                var enumerable = permute
+                    .Where(x =>
+                    {
+                        var pairs = x.ToBatches(2).Where(p => components[p[0]].Contains(p[1]));
+                        return pairs.Count() == 3;
+                    })
+                    ;
+                var combinations = enumerable
+                    .Select(x => x.ToList())
+                    .Where(x =>
+                    {
+                        var dict2 = dict.ToDictionary(x => x.Key, x => x.Value.ToHashSet());
+                        var pairs = x.ToBatches(2).Where(p => dict2[p[0]].Contains(p[1]));
+                        foreach (var pair in pairs)
+                        {
+                            var name1 = pair[0];
+                            var name2 = pair[1];
+                            if (!dict2.ContainsKey(name1) || !dict2[name1].Contains(name2))
+                                return false;
+
+                            dict2.ForEach((x, i) =>
+                            {
+                                x.Value.Remove(name2);
+                                x.Value.Remove(name1);
+                            });
+                            dict2.ToList().ForEach((x, i) =>
+                            {
+                                if (x.Value.Count == 0) dict2.Remove(x.Key);
+                            });
+                        }
+                        return true;
+                    })
                     .ToList();
 
-                //     while (remove.Any())
-                //     {
-                //         name1 = remove.Key;
-                //         var name2 = remove.Value.First(x => dict.ContainsKey(x));
-                //         components[name1].Remove(name2);
-                //         components[name2].Remove(name1);
-                //         disconnected++;
-                //         Debug.WriteLine($"{disconnected} Disconnect {name1}:{name2}");
-                //         dict.ForEach((x, i) =>
-                //         {
-                //             x.Value.Remove(name2);
-                //             x.Value.Remove(name1);
-                //         });
-                //         dict.ToList().ForEach((x, i) =>
-                //         {
-                //             if (x.Value.Count == 0) dict.Remove(x.Key);
-                //         });
-                //         remove = dict.MinBy(x => x.Value.Count);
-                //     }
+                foreach (var comb in combinations)
+                {
+                    var disconnected = 0;
+                    var dict2 = dict.ToDictionary(x => x.Key, x => x.Value.ToHashSet());
+                    foreach (var pair in comb.ToBatches(2))
+                    {
+
+                        var name1 = pair.First();
+                        var name2 = pair.Skip(1).First();
+                        components[name1].Remove(name2);
+                        components[name2].Remove(name1);
+                        disconnected++;
+                        Debug.WriteLine($"{disconnected} Disconnect {name1}:{name2}");
+                        dict.ForEach((x, i) =>
+                        {
+                            x.Value.Remove(name2);
+                            x.Value.Remove(name1);
+                        });
+                        dict.ToList().ForEach((x, i) =>
+                        {
+                            if (x.Value.Count == 0) dict.Remove(x.Key);
+                        });
+                    }
+                    break;
+                }
 
 
                 return centrality[0].Key;
 
-                static void Permute(string[] array, int i,List<List<string>>  )
-                {
-                    if (i == array.Length)
-                    {
-                        return;
-                    }
-
-                    for (int j = i; j < array.Length; j++)
-                    {
-                        Swap(ref array[i], ref array[j]);
-                        Permute(array, i + 1);
-                        Swap(ref array[i], ref array[j]);
-                    }
-                    static void Swap(ref string a, ref string b)
-                    {
-                        (a, b) = (b, a);
-                    }
-                }
 
             }
         }
