@@ -36,6 +36,10 @@ namespace common
                 ++i;
             }
         }
+        public static IEnumerable<T> ExcludeIndex<T>(this IEnumerable<T> src, int index)
+        {
+            return src.Where((value, ix) => ix != index).ToArray(); 
+        }
         public static bool In<T>(this T src, IEnumerable<T> elems)
         {
             return elems.Contains(src);
