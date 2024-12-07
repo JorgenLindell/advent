@@ -1,4 +1,5 @@
-﻿using common;
+﻿
+using common;
 
 var lines = StreamUtils.GetLines();
 var list1 = new List<int>();

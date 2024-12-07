@@ -21,6 +21,19 @@ namespace common
             rest = seq.Skip(1);
             // ReSharper restore PossibleMultipleEnumeration
         }
+        public static void Deconstruct<T>(this T[]? seq, out T first, out T[] rest)
+        {
+            if (seq == null)
+            {
+                throw new ArgumentNullException(nameof(seq));
+            }
+
+            // ReSharper disable PossibleMultipleEnumeration
+            first = seq.FirstOrDefault()!;
+
+            rest = seq.Skip(1).ToArray();
+            // ReSharper restore PossibleMultipleEnumeration
+        }
 
 
         public static void Deconstruct<T>(this IEnumerable<T> seq, out T first, out T second, out IEnumerable<T> rest)
