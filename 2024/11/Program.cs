@@ -20,33 +20,40 @@ var list = data[0]
     .Split(" ", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
     .Select(s => s.ToLong() ?? 0)
     .ToList();
+
 var cache = new Dictionary<(long stone, int step), long>();
 
 var sw = new Stopwatch();
 sw.Start();
+int stepLimit = 75;
 
 long cnt = list.Count;
 for (var i = 0; i < list.Count; i++)
 {
     var stone = list[i];
-    cnt += CalcStone(stone, 0, 75);
+    cnt += CalcStone(stone, 0);
 }
 
 
 Console.WriteLine(cnt);
 Console.WriteLine(cache.Count);
+Console.WriteLine(sw.ElapsedMilliseconds+" ms");
 return;
 
-long CalcStone(long stone, int step, int stepLimit)
+long CalcStone(long stone, int step)
 {
     if (step >= stepLimit)
         return 0;
 
+    if (cache.ContainsKey((stone, step)))
+        return cache[(stone, step)];
+
     var nextStep = step + 1;
+
     if (stone == 0)
     {
-        var result = !cache.ContainsKey((1, nextStep)) ? cache[(1, nextStep)] = CalcStone(1, nextStep, stepLimit) : cache[(1, nextStep)];
-        return result;
+        var result = CalcStone(1, nextStep);
+        return cache[(stone, step)] = cache[(1,nextStep)] = result;
     }
 
     if (Math.Abs(stone).ToString().Length % 2 == 0)
@@ -56,14 +63,14 @@ long CalcStone(long stone, int step, int stepLimit)
         var new1 = number[..len].ToLong() ?? 0;
         var new2 = number[len..].ToLong() ?? 0;
 
-        var result1 = !cache.ContainsKey((new1, nextStep)) ? cache[(new1, nextStep)] = CalcStone(new1, nextStep, stepLimit) : cache[(new1, nextStep)];
-        var result2 = !cache.ContainsKey((new2, nextStep)) ? cache[(new2, nextStep)] = CalcStone(new2, nextStep, stepLimit) : cache[(new2, nextStep)];
-
+        var result1 = cache[(new1, nextStep)] = CalcStone(new1, nextStep);
+        var result2 = cache[(new2, nextStep)] = CalcStone(new2, nextStep);
+        cache[(stone, step)] = 1 + result1 + result2;
         return 1 + result1 + result2;
     }
 
     var newStone = 2024 * stone;
-    var calcStone = !cache.ContainsKey((newStone, nextStep)) ? cache[(newStone, nextStep)] = CalcStone(newStone, nextStep, stepLimit) : cache[(newStone, nextStep)];
+    var calcStone = cache[(stone, step)] = cache[(newStone, nextStep)] = CalcStone(newStone, nextStep);
     return calcStone;
 }
 
