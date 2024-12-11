@@ -82,4 +82,9 @@ public record struct VectorRc(int Row, int Col) : IComparable<VectorRc>
     {
         return $"<{Row},{Col}>";
     }
+
+    public bool Inside(int c0, int r0, int c1, int r1)
+    {
+        return (Col >= c0 && Col <c1 && Row >= r0 && Row < r1);
+    }
 }
